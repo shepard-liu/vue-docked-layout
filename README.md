@@ -1,3 +1,6 @@
-# docked-layout
+# vue-docked-layout
 
-Flexible, IDE-like docked panels layout built for vue.js.
+高度灵活可定制的vue停靠式面板布局组件。
+
+## (开发中)
+
