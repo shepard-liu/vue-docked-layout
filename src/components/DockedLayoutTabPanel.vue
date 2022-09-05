@@ -22,6 +22,16 @@
                             $event
                         )
                     "
+                    @drop="
+                        $emit(
+                            'panelDrop',
+                            {
+                                dropComponentIndex: index,
+                                dropComponent: tabName,
+                            },
+                            $event
+                        )
+                    "
                     @mouseDown="switchTab(index)"
                     :canCloseOtherPanels="components.length > 1"
                     :key="tabName">
@@ -128,6 +138,7 @@ export default {
         "closePanelGroup",
         "floatPanel",
         "panelDragStart",
+        "panelDrop",
     ],
 };
 </script>

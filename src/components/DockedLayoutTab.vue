@@ -1,15 +1,18 @@
 <template>
-    <span
+    <div
         class="docked-layout-tab"
         ref="tab"
         :data-active="active"
         :data-dragging="dragging"
+        :data-drag-over="dragOver"
         :draggable="active"
         @dragstart="handleDragStart"
         @drag="$emit('drag', $event)"
         @dragend="handleDragEnd"
         @dragenter="handleDragEnter"
         @dragleave="handleDragLeave"
+        @dragover="handleDragOver"
+        @drop="handleDrop"
         @mousedown="$emit('mouseDown', $event)"
         @mouseup="$emit('mouseUp', $event)"
         @click="$emit('click', $event)">
@@ -32,7 +35,7 @@
                 {{ item.name }}
             </DockedLayoutMenuItem>
         </DockedLayoutMenu>
-    </span>
+    </div>
 </template>
 
 <script>
@@ -56,6 +59,8 @@ export default {
             menuRightOffset: 0,
             // 是否正在被拖动
             dragging: false,
+            // 是否有其他面板页签进入本页签的位置
+            dragOver: false,
         };
     },
     computed: {
@@ -98,6 +103,7 @@ export default {
         // 处理拖动开始
         handleDragStart(event) {
             this.dragging = true;
+            event.dataTransfer.effectAllowed = "move";
             this.$emit("dragStart", event);
         },
         // 处理拖动结束
@@ -106,9 +112,37 @@ export default {
             this.$emit("dragEnd", event);
         },
         // 处理拖动进入
-        handleDragEnter(event) {},
+        handleDragEnter(event) {
+            if (this.dragging === true) return;
+
+            this.dragOver = true;
+            this.$emit("dragEnter", event);
+        },
         // 处理拖动离开
-        handleDragLeave(event) {},
+        handleDragLeave(event) {
+            if (this.dragging === true) return;
+
+            this.dragOver = false;
+            this.$emit("dragLeave", event);
+        },
+        // 处理拖动悬浮
+        handleDragOver(event) {
+            if (this.dragging === true) return;
+
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+
+            this.$emit("dragOver", event);
+        },
+        // 处理拖动放置事件
+        handleDrop(event) {
+            if (this.dragging === true) return;
+
+            event.preventDefault();
+            this.dragOver = false;
+
+            this.$emit("drop", event);
+        },
     },
     emits: [
         "click",
@@ -121,6 +155,10 @@ export default {
         "dragStart",
         "drag",
         "dragEnd",
+        "dragEnter",
+        "dragLeave",
+        "dragOver",
+        "drop",
     ],
     components: { IconMenu, DockedLayoutMenu, DockedLayoutMenuItem },
 };
@@ -146,6 +184,16 @@ export default {
 
     &[data-dragging="true"] {
         opacity: 0.5;
+    }
+
+    &[data-drag-over="true"] {
+        background-color: gray;
+
+        & .icon-menu-wrapper {
+            // 拖拽时遇到子元素会触发dragLeave事件，还有一种解决方案
+            // @see https://stackoverflow.com/questions/7110353/html5-dragleave-fired-when-hovering-a-child-element
+            pointer-events: none;
+        }
     }
 }
 

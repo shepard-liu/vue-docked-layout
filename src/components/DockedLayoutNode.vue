@@ -35,6 +35,7 @@
         @closePanelGroup="handleClosePanelGroup"
         @floatPanel="handleFloatPanel"
         @panelDragStart="handlePanelDragStart"
+        @panelDrop="handlePanelDrop"
         class="docked-layout-node docked-layout-node--tab-panel">
         <slot
             v-for="component in layoutNodeCache?.components"
@@ -225,9 +226,27 @@ export default {
                 "panel",
                 JSON.stringify({
                     component,
-                    fromNodeId: this.path.join(""),
+                    // 使用结点路径唯一确定来源结点
+                    nodePath: this.path,
+                    // 面板的位置下标
+                    componentIndex: index,
                 })
             );
+        },
+        // 在特定的tab上放置面板事件
+        handlePanelDrop({ dropComponentIndex, dropComponent }, event) {
+            const { component, componentIndex, nodePath } = JSON.parse(
+                event.dataTransfer.getData("panel")
+            );
+            // 调用Inject的函数，交由DockedLayout顶层处理
+            this.dndPanelToTabNav({
+                fromNodePath: nodePath,
+                fromComponent: component,
+                fromComponentIndex: componentIndex,
+                toNodePath: this.path,
+                toComponentIndex: dropComponentIndex,
+                toComponent: dropComponent,
+            });
         },
         // 抛出异常诊断信息
         throwNodeError(msg) {
@@ -380,6 +399,8 @@ export default {
         layoutConfig: "layoutConfig",
         // 从结点更新整个布局树
         updateLayoutFromNode: "updateLayoutFromNode",
+        // 拖放面板
+        dndPanelToTabNav: "dndPanelToTabNav",
     },
 };
 </script>
