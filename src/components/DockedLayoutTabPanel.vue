@@ -24,7 +24,7 @@
                     "
                     @drop="
                         $emit(
-                            'panelDrop',
+                            'panelDropOnNav',
                             {
                                 dropComponentIndex: index,
                                 dropComponent: tabName,
@@ -34,28 +34,62 @@
                     "
                     @mouseDown="switchTab(index)"
                     :canCloseOtherPanels="components.length > 1"
-                    :key="tabName">
+                    :key="tabName"
+                >
                     {{ tabName }}
                 </DockedLayoutTab>
+                <!-- 占据面板导航栏剩余空间（若有）的元素，用作尾部拖放区 -->
+                <div
+                    class="nav-drop-area"
+                    :data-drag-over="navDragOver"
+                    @dragenter="handleNavDragEnter"
+                    @dragover="handleNavDragOver"
+                    @drop="handleNavDrop"
+                    @dragleave="handleNavDragLeave"
+                ></div>
+                <!-- 激活面板选择按钮 -->
                 <div
                     class="more-btn"
                     @click="handleClickMoreBtn"
-                    v-show="showMoreBtn">
+                    v-show="showMoreBtn"
+                >
                     <IconDropdown class="more-btn-icon" />
                 </div>
             </div>
-
+            <!-- 激活面板选择菜单 -->
             <DockedLayoutMenu :show="showTabsMenu" class="tabs-menu">
                 <DockedLayoutMenuItem
                     v-for="(tabName, index) in components"
                     @click="switchTab(index)"
                     :active="tabName === currentTab"
-                    :key="tabName">
+                    :key="tabName"
+                >
                     {{ tabName }}
                 </DockedLayoutMenuItem>
             </DockedLayoutMenu>
         </div>
-        <div class="tab-content">
+        <!-- 面板内容区 -->
+        <div
+            class="tab-content"
+            ref="tabContent"
+            @dragenter="++contentDragCounter"
+            @dragleave="--contentDragCounter"
+        >
+            <!-- 停靠操作面板 -->
+            <template v-if="contentDragCounter > 0">
+                <div
+                    v-for="area in dockActionPaneAreas"
+                    :class="area.className"
+                    :data-drag-over="currentDndPointerArea === area.name"
+                    @dragenter="
+                        ++contentDragCounter;
+                        currentDndPointerArea = area.name;
+                    "
+                    @dragleave="--contentDragCounter"
+                    @dragover="handleDockAreaDragOver"
+                    @drop="handleDockAreaDrop(area.name, $event)"
+                />
+            </template>
             <slot :name="currentTab"></slot>
         </div>
     </div>
@@ -90,6 +124,46 @@ export default {
             showMoreBtn: false,
             // 是否显示更多菜单
             showTabsMenu: false,
+            // 导航条拖放悬浮
+            navDragOver: false,
+            // 停靠面板操作区类名列表
+            dockActionPaneAreas: [
+                // "向左停靠面板"拖放区域
+                {
+                    className: "dock-left",
+                    name: "left",
+                },
+                // "向右停靠面板"拖放区域
+                {
+                    className: "dock-right",
+                    name: "right",
+                },
+                // "向上停靠面板"拖放区域
+                {
+                    className: "dock-above",
+                    name: "above",
+                },
+                // "向下停靠面板"拖放区域
+                {
+                    className: "dock-below",
+                    name: "below",
+                },
+                // "停入面板"拖放区域
+                {
+                    className: "dock-into",
+                    name: "center",
+                },
+            ],
+            /**
+             * 内容区拖放进出计数器
+             *
+             * 该变量在内容区停靠操作面板元素及子元素上每次拖放进入(dragEnter)时+1，
+             * 在每次拖放离开(dragLeave)时-1。
+             * 计数器不为0时，显示停靠操作面板。
+             */
+            contentDragCounter: 0,
+            // 当前拖放指针所在的停靠操作区域
+            currentDndPointerArea: null,
         };
     },
     computed: {
@@ -121,6 +195,46 @@ export default {
         handlePanelDragStart({ component, index }, event) {
             this.$emit("panelDragStart", { component, index }, event);
         },
+        // 处理导航条拖放进入
+        handleNavDragEnter() {
+            this.navDragOver = true;
+        },
+        // 处理导航条拖放离开
+        handleNavDragLeave() {
+            this.navDragOver = false;
+        },
+        // 处理导航条拖放悬浮
+        handleNavDragOver(event) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+        },
+        // 处理导航条放置
+        handleNavDrop(event) {
+            this.navDragOver = false;
+
+            if (!this.validatePanelDndDataType(event)) return;
+
+            this.$emit(
+                "panelDropOnNav",
+                {
+                    dropComponentIndex: this.components.length,
+                    dropComponent: null,
+                },
+                event
+            );
+        },
+        // 处理停靠区域拖放悬浮
+        handleDockAreaDragOver(event) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "move";
+        },
+        // 处理停靠区域放置
+        handleDockAreaDrop(area, event) {
+            this.contentDragCounter = 0;
+            this.currentDndPointerArea = null;
+
+            this.$emit("panelDropOnDockActionPane", area, event);
+        },
     },
     mounted() {
         window.addEventListener("resize", this.updateMoreButtonVisibility);
@@ -138,8 +252,13 @@ export default {
         "closePanelGroup",
         "floatPanel",
         "panelDragStart",
-        "panelDrop",
+        "panelDropOnNav",
+        "panelDropOnContent",
+        "panelDropOnDockActionPane",
     ],
+    inject: {
+        validatePanelDndDataType: "validatePanelDndDataType",
+    },
 };
 </script>
 
@@ -159,6 +278,8 @@ export default {
 }
 
 .tab-nav {
+    display: flex;
+
     background-color: rgb(231, 231, 231);
     overflow-x: auto;
     white-space: nowrap;
@@ -167,6 +288,17 @@ export default {
     // 隐藏滑动条
     &::-webkit-scrollbar {
         display: none;
+    }
+}
+
+.nav-drop-area {
+    height: 100%;
+    // 占据剩余空间(若有)
+    flex: 1;
+
+    // 拖放悬浮时
+    &[data-drag-over="true"] {
+        background-color: rgb(160, 160, 160);
     }
 }
 
@@ -183,6 +315,7 @@ export default {
     background-color: rgb(118, 118, 118);
     height: 100%;
     width: 25px;
+    padding: 5px;
     vertical-align: top;
     color: white;
     cursor: pointer;
@@ -203,5 +336,74 @@ export default {
 .tab-content {
     flex: 1;
     overflow: hidden;
+    position: relative;
+}
+
+@mixin dockAreaMixin($orient: NULL) {
+    position: absolute;
+    z-index: 99999; // 显示在面板内容之前
+    opacity: 0.2;
+
+    @if $orient == "v" {
+        width: 25%;
+        height: 100%;
+    } @else if $orient == "h" {
+        width: 100%;
+        height: 25%;
+    }
+
+    transition: all 200ms ease-in-out;
+
+    &[data-drag-over="true"] {
+        transform: scale(1.1);
+        opacity: 0;
+    }
+}
+// 向上停靠区
+.dock-above {
+    @include dockAreaMixin($orient: "h");
+    clip-path: polygon(0 0, 100% 0, 75% 100%, 25% 100%);
+    background: rgb(15, 20, 91);
+    top: 0;
+    left: 0;
+}
+
+// 向下停靠区
+.dock-below {
+    @include dockAreaMixin($orient: "h");
+    clip-path: polygon(25% 0, 75% 0, 100% 100%, 0 100%);
+    background: rgb(15, 91, 38);
+    bottom: 0;
+    left: 0;
+}
+
+// 向右停靠区
+
+.dock-right {
+    @include dockAreaMixin($orient: "v");
+    clip-path: polygon(0 25%, 100% 0, 100% 100%, 0 75%);
+    background: rgb(91, 15, 28);
+    right: 0;
+    top: 0;
+}
+
+// 向左停靠区
+.dock-left {
+    @include dockAreaMixin($orient: "v");
+    clip-path: polygon(0 0, 100% 25%, 100% 75%, 0 100%);
+    background: rgb(91, 43, 15);
+
+    left: 0;
+    top: 0;
+}
+
+// 停入面板停靠区
+.dock-into {
+    @include dockAreaMixin();
+    background: rgb(83, 83, 83);
+    width: 50%;
+    height: 50%;
+    top: 25%;
+    left: 25%;
 }
 </style>

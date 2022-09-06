@@ -1,9 +1,4 @@
 
-// 将value正规化为数组
-export function makeArray(value) {
-    return Array.isArray(value) ? value : [value];
-}
-
 /**
  * 封装菜单开关的状态逻辑
  * 
@@ -42,7 +37,7 @@ export function toggleMenu(self, showStateName) {
  * 防抖函数
  * @param {(...args: any) => unknown} fn  被防抖函数
  * @param {number} ms 延迟时间milliseconds
- * @returns {Promise<ReturnType<typeof fn>>} 被防抖函数（使用Promise包装返回值），若触发防抖则会reject
+ * @returns {(...args:any)=>Promise<unknown>} 被防抖函数（使用Promise包装返回值），若触发防抖则会reject
  */
 export function debounce(fn, ms) {
     let timeOut = null;
@@ -64,8 +59,8 @@ export function debounce(fn, ms) {
 /**
  * 节流钩子函数
  * @param {(...args: any) => unknown} fn 被节流函数
- * @param {number} 延迟时间milliseconds
- * @returns {Promise<ReturnType<typeof fn>>} 被节流函数（使用Promise包装返回值），若触发节流则会reject
+ * @param {number} ms 延迟时间milliseconds
+ * @returns {(...args:any)=>Promise<unknown>} 被节流函数（使用Promise包装返回值），若触发节流则会reject
  */
 export function throttle(fn, ms) {
     let shouldRun = true;
@@ -87,7 +82,7 @@ export function throttle(fn, ms) {
  * 同步节流钩子函数，被节流函数首次调用将立即执行，此后一段时间内只能执行一次
  * @param {(...args: any) => unknown} fn  被节流函数
  * @param {number} ms 延迟时间milliseconds
- * @returns {Promise<ReturnType<typeof fn>>}
+ * @returns {(...args:any) => unknown} 
  */
 export function throttleSync(fn, ms) {
     let lastTime = Date.now() - ms;

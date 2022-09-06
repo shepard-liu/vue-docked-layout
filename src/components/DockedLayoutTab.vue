@@ -15,23 +15,27 @@
         @drop="handleDrop"
         @mousedown="$emit('mouseDown', $event)"
         @mouseup="$emit('mouseUp', $event)"
-        @click="$emit('click', $event)">
+        @click="$emit('click', $event)"
+    >
         <slot />
         <div
             @click="handleClickMenu"
             class="icon-menu-wrapper"
-            :data-show="active">
+            :data-show="active"
+        >
             <IconMenu class="icon-menu" />
         </div>
         <DockedLayoutMenu
             class="tabs-menu"
-            :show="showTabsMenu"
-            :style="{ right: `${menuRightOffset}px` }">
+            :show="showTabsMenu && !dragging"
+            :style="{ right: `${menuRightOffset}px` }"
+        >
             <DockedLayoutMenuItem
                 v-for="item in menuItems"
                 @click="$emit(item.emit)"
                 :disabled="item.disabled"
-                :key="item.name">
+                :key="item.name"
+            >
                 {{ item.name }}
             </DockedLayoutMenuItem>
         </DockedLayoutMenu>
@@ -136,10 +140,12 @@ export default {
         },
         // 处理拖动放置事件
         handleDrop(event) {
-            if (this.dragging === true) return;
+            this.dragOver = false;
+
+            if (this.dragging === true || !this.validatePanelDndDataType(event))
+                return;
 
             event.preventDefault();
-            this.dragOver = false;
 
             this.$emit("drop", event);
         },
@@ -161,6 +167,9 @@ export default {
         "drop",
     ],
     components: { IconMenu, DockedLayoutMenu, DockedLayoutMenuItem },
+    inject: {
+        validatePanelDndDataType: "validatePanelDndDataType",
+    },
 };
 </script>
 
@@ -168,7 +177,7 @@ export default {
 @use "./shared.scss";
 
 .docked-layout-tab {
-    display: inline-flex;
+    display: flex;
     align-items: center;
 
     height: 100%;
@@ -216,6 +225,7 @@ export default {
 
 .tabs-menu {
     position: absolute;
+    z-index: 99999;
     top: 100%;
 }
 </style>

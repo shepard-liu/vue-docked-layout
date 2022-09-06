@@ -24,53 +24,71 @@
 -->
 
 <template>
-    <!-- 若为组件结点，则渲染Tab面板 -->
-    <DockedLayoutTabPanel
-        v-if="isComponentNode"
-        :components="layoutNodeCache?.components"
-        :activeComponent="layoutNodeCache.activeComponent"
-        @activeChange="handleTabActiveChange"
-        @closePanel="handleClosePanel"
-        @closeOtherPanels="handleCloseOtherPanels"
-        @closePanelGroup="handleClosePanelGroup"
-        @floatPanel="handleFloatPanel"
-        @panelDragStart="handlePanelDragStart"
-        @panelDrop="handlePanelDrop"
-        class="docked-layout-node docked-layout-node--tab-panel">
-        <slot
-            v-for="component in layoutNodeCache?.components"
-            :name="component"
-            :slot="component" />
-    </DockedLayoutTabPanel>
     <!-- 若为子布局结点，则渲染子结点 -->
-    <div
-        v-else
-        class="docked-layout-node docked-layout-node--sublayout"
-        ref="node">
-        <template v-for="(child, index) in layoutNodeCache?.children">
+    <div class="docked-layout-node" ref="node">
+        <!-- 若为组件结点，则渲染Tab面板 -->
+        <DockedLayoutTabPanel
+            v-if="isComponentNode"
+            :components="layoutNodeCache?.components"
+            :activeComponent="layoutNodeCache.activeComponent"
+            @activeChange="handleTabActiveChange"
+            @closePanel="handleClosePanel"
+            @closeOtherPanels="handleCloseOtherPanels"
+            @closePanelGroup="handleClosePanelGroup"
+            @floatPanel="handleFloatPanel"
+            @panelDragStart="handlePanelDragStart"
+            @panelDropOnNav="handlePanelDrop"
+            @panelDropOnDockActionPane="handlePanelDock"
+            class="tab-panel"
+        >
+            <slot
+                v-for="component in layoutNodeCache?.components"
+                :name="component"
+                :slot="component"
+            />
+        </DockedLayoutTabPanel>
+        <template v-else v-for="(child, index) in layoutNodeCache?.children">
             <DockedLayoutNode
                 class="subnode"
                 :style="subNodeStyles[index]"
                 :layoutNode="child"
                 :path="childPath(index)"
-                @destruct="handleRemoveSubnode(index)">
+                @destruct="handleRemoveSubnode(index)"
+                @optimizeNesting="handleOptimizeNestedChild(index)"
+            >
                 <slot
                     v-for="(_, slotName) in $slots"
                     :name="slotName"
-                    :slot="slotName" />
+                    :slot="slotName"
+                />
             </DockedLayoutNode>
             <!-- 在子结点之间渲染分割条组件 -->
             <DockedLayoutSplit
                 v-if="index !== layoutNodeCache?.children.length - 1"
-                @splitDrag="handleDragSplit(index, $event)"
-                :orient="layoutNodeCache.orient" />
+                @splitDragStart="handleSplitDragStart(index, $event)"
+                @splitDrag="handleSplitDrag(index, $event)"
+                @splitDragEnd="handleSplitDragEnd(index, $event)"
+                :orient="layoutNodeCache.orient"
+            />
         </template>
+        <!-- 若为根结点，渲染浮动面板 -->
+        <!-- <DockedLayoutNode
+            v-if="isRoot"
+            v-for="(child, index) in layoutNodeCache?.floating"
+            :layoutNode="child"
+        >
+            <slot
+                v-for="(_, slotName) in $slots"
+                :name="slotName"
+                :slot="slotName"
+            />
+        </DockedLayoutNode> -->
     </div>
 </template>
 
 <script>
 import lodash from "lodash";
-import { makeArray, debounce, approxEq } from "../utils";
+import { approxEq } from "../utils";
 import { uniqueId } from "../utils/uniqueId";
 import DockedLayoutTabPanel from "./DockedLayoutTabPanel.vue";
 import DockedLayoutSplit from "./DockedLayoutSplit.vue";
@@ -89,18 +107,6 @@ function validateSize(value) {
 }
 
 const nextId = uniqueId("__docked_layout_node_");
-
-// 方向映射对象：将方向别名映射为'v'或'h'
-const orientMap = {
-    vertical: "v",
-    horizontal: "h",
-    v: "v",
-    h: "h",
-    Vertical: "v",
-    Horizontal: "h",
-    VERTICAL: "v",
-    HORIZONTAL: "h",
-};
 
 // 方向属性对象：由'v'或'h'获取相关属性
 const orientPropsMap = {
@@ -139,11 +145,15 @@ export default {
         return {
             // 缓存改变的layoutNode属性
             layoutNodeCache: null,
-            // 防抖的更新布局树函数，在inject变量准备好后可用
-            debouncedUpdateLayoutFromNode: null,
+            // 更新整个布局树
+            updateLayoutTree: null,
+            // 节流的更新整个布局树
+            throttledUpdateLayoutTree: null,
+            // 子结点resize过程初始值
+            childStartSizes: null,
         };
     },
-    emits: ["destruct"],
+    emits: ["destruct", "optimizeNesting"],
     methods: {
         getNextId() {
             return nextId();
@@ -152,20 +162,38 @@ export default {
         childPath(index) {
             return [...this.path, index];
         },
+        // 处理分隔条拖动开始事件
+        handleSplitDragStart(index, _) {
+            const node = this.layoutNodeCache;
+            const mainSizeProp = orientPropsMap[node.orient].mainSizeProp;
+
+            const beforeChildStartSize = node.children[index][mainSizeProp],
+                afterChildStartSize = node.children[index + 1][mainSizeProp];
+            // 记录本次resize过程子结点尺寸初始值
+            this.childStartSizes = {
+                beforeChildStartSize,
+                afterChildStartSize,
+            };
+        },
         // 处理拖动分割条事件
-        async handleDragSplit(index, event) {
+        handleSplitDrag(index, event) {
             const node = this.layoutNodeCache;
             const { parentSizeProp, mainSizeProp, minMainSizeProp } =
                 orientPropsMap[node.orient];
-            // 计算与分割线相邻的两个元素的尺寸改变量
+            // 获取resize开始时记录的子结点尺寸初值
+            const { beforeChildStartSize, afterChildStartSize } =
+                this.childStartSizes;
+            // 计算与分割线相邻的两个元素的尺寸从resize过程开始到现在的改变量百分比（相对于父元素总大小）
             const percentageDelta =
-                (event.delta / this.$refs.node[parentSizeProp]) * 100;
+                ((event.current - event.start) /
+                    this.$refs.node[parentSizeProp]) *
+                100;
             // 获取分割线两侧的子结点
             const beforeChild = node.children[index],
                 afterChild = node.children[index + 1];
             // 应用子结点的尺寸更改
-            const beforeNewSize = beforeChild[mainSizeProp] + percentageDelta;
-            const afterNewSize = afterChild[mainSizeProp] - percentageDelta;
+            const beforeNewSize = beforeChildStartSize + percentageDelta;
+            const afterNewSize = afterChildStartSize - percentageDelta;
             // 保证两个子结点的尺寸都不小于最小尺寸值
             if (
                 beforeNewSize < beforeChild[minMainSizeProp] ||
@@ -176,17 +204,21 @@ export default {
             // 应用更改
             beforeChild[mainSizeProp] = beforeNewSize;
             afterChild[mainSizeProp] = afterNewSize;
-            // 请求根结点更新
-            await this.debouncedUpdateLayoutFromNode(node);
+        },
+        // 处理拖动分割条结束事件
+        handleSplitDragEnd() {
+            // 更新布局树
+            this.updateLayoutTree(this.layoutNodeCache);
+            this.childStartSizes = null;
         },
         // 组件结点下当前激活的面板改变事件
-        async handleTabActiveChange(current) {
+        handleTabActiveChange(current) {
             const node = this.layoutNodeCache;
             node.activeComponent = current;
-            await this.debouncedUpdateLayoutFromNode(node);
+            this.updateLayoutTree(node);
         },
         // 特定面板关闭
-        async handleClosePanel({ _, index }) {
+        handleClosePanel({ _, index }) {
             const node = this.layoutNodeCache;
 
             // 若当前面板组内面板数量大于1
@@ -194,18 +226,18 @@ export default {
                 node.components.splice(index, 1);
                 node.activeComponent = node.components[0];
 
-                await this.debouncedUpdateLayoutFromNode(node);
+                this.updateLayoutTree(node);
             } else {
                 // 移除整个面板组
-                await this.handleClosePanelGroup();
+                this.handleClosePanelGroup();
             }
         },
         // 关闭特定面板外的其他面板
-        async handleCloseOtherPanels({ _, index }) {
+        handleCloseOtherPanels({ _, index }) {
             const node = this.layoutNodeCache;
             node.components = node.components.slice(index, index + 1);
 
-            await this.debouncedUpdateLayoutFromNode(node);
+            this.updateLayoutTree(node);
         },
         // 关闭面板组，移除本结点
         handleClosePanelGroup() {
@@ -221,6 +253,10 @@ export default {
                 "text/plain",
                 `DockedLayout - Dragging Panel ${component}`
             );
+
+            // 添加数据标记
+            this.setPanelDndDataType(event);
+
             // 拖动操作的数据
             event.dataTransfer.setData(
                 "panel",
@@ -233,19 +269,30 @@ export default {
                 })
             );
         },
-        // 在特定的tab上放置面板事件
+        // 在特定的tab或tavNav上放置面板事件
         handlePanelDrop({ dropComponentIndex, dropComponent }, event) {
-            const { component, componentIndex, nodePath } = JSON.parse(
+            const { componentIndex, nodePath } = JSON.parse(
                 event.dataTransfer.getData("panel")
             );
             // 调用Inject的函数，交由DockedLayout顶层处理
             this.dndPanelToTabNav({
                 fromNodePath: nodePath,
-                fromComponent: component,
                 fromComponentIndex: componentIndex,
                 toNodePath: this.path,
                 toComponentIndex: dropComponentIndex,
-                toComponent: dropComponent,
+            });
+        },
+        // 在结点停靠面板
+        handlePanelDock(area, event) {
+            const { componentIndex, nodePath } = JSON.parse(
+                event.dataTransfer.getData("panel")
+            );
+
+            this.dndPanelToDockArea({
+                fromNodePath: nodePath,
+                toNodePath: this.path,
+                fromComponentIndex: componentIndex,
+                dockArea: area,
             });
         },
         // 抛出异常诊断信息
@@ -254,7 +301,7 @@ export default {
             throw new Error(msg);
         },
         // 处理子结点移除
-        async handleRemoveSubnode(index) {
+        handleRemoveSubnode(index) {
             const node = this.layoutNodeCache;
             const { mainSizeProp } = orientPropsMap[node.orient];
             // 移除该结点并获取它的尺寸
@@ -270,7 +317,18 @@ export default {
                 return;
             }
 
-            await this.debouncedUpdateLayoutFromNode(node);
+            this.updateLayoutTree(node);
+        },
+        // 处理优化孤子嵌套问题
+        handleOptimizeNestedChild(index) {
+            const node = this.layoutNodeCache;
+            const child = node.children[index];
+            const grandChild = child.children[0];
+            child.children = grandChild.children;
+            child.components = grandChild.components;
+            child.orient = grandChild.orient;
+            this.updateLayoutTree(node);
+            console.log("消除孤子", node.children[index]);
         },
     },
     computed: {
@@ -347,51 +405,41 @@ export default {
                 const omittedChildren = isOmitted(node.children);
                 const omittedComponents = isOmitted(node.components);
 
-                // 检查是否同时指定或同时未指定children和components
-                if (omittedChildren === omittedComponents) {
+                // 检查是否同时指定指定children和components
+                if (!omittedChildren && !omittedComponents) {
                     this.throwNodeError(
-                        `布局结点必须为子布局结点和组件结点中的一种`
+                        `布局结点不可同时指定children和components属性。`
                     );
+                } else if (omittedChildren && omittedComponents) {
+                    // 该节点为空节点，自毁
+                    this.$emit("destruct");
+                    return;
                 }
 
                 // 若为子布局结点
                 if (omittedComponents) {
-                    const orient = orientMap[node.orient];
                     // 检查是否指定orient
-                    if (orient === undefined)
+                    if (node.orient === undefined)
                         this.throwNodeError(
                             "DockerLayoutNode: 子布局结点未指定orient属性"
                         );
+                    // 检查是否为孤子结点
+                    if (node.children.length === 1) {
+                        this.$emit("optimizeNesting", node.children);
+                        return;
+                    }
                 }
 
-                // 创建正规化缓存对象
-                const cacheNode = (this.layoutNodeCache = lodash.cloneDeep(
-                    this.layoutNode
-                ));
-                // 正规化子布局结点
-                if (cacheNode.children)
-                    cacheNode.children = makeArray(cacheNode.children);
-                // 正规化组件列表
-                if (cacheNode.components)
-                    cacheNode.components = makeArray(cacheNode.components);
-                // 正规化布局结点方向
-                if (cacheNode.orient)
-                    cacheNode.orient = orientMap[cacheNode.orient];
+                // 创建缓存对象
+                this.layoutNodeCache = lodash.cloneDeep(this.layoutNode);
             },
         },
     },
     mounted() {
         const self = this;
-        // inject变量updateLayoutFromNode在created()前已准备好。debouncedUpdateLayoutFromNode函数将在防抖500ms执行更新布局树函数
-        const debouncedUpdate = debounce(function (node) {
+        // 更新整个布局树。
+        this.updateLayoutTree = function (node) {
             self.updateLayoutFromNode(self.path, node);
-        }, 500);
-        self.debouncedUpdateLayoutFromNode = async function (node) {
-            try {
-                await debouncedUpdate(node);
-            } catch {
-                console.log("DockedLayoutNode: 布局树更新防抖触发");
-            }
         };
     },
     inject: {
@@ -401,6 +449,11 @@ export default {
         updateLayoutFromNode: "updateLayoutFromNode",
         // 拖放面板
         dndPanelToTabNav: "dndPanelToTabNav",
+        dndPanelToDockArea: "dndPanelToDockArea",
+        // 设置拖动数据标记
+        setPanelDndDataType: "setPanelDndDataType",
+        // 校验数据标记是否为本系统提供
+        validatePanelDndDataType: "validatePanelDndDataType",
     },
 };
 </script>
@@ -413,12 +466,8 @@ export default {
     vertical-align: top;
 }
 
-.docked-layout-node--tab-panel {
-}
-
-.docked-layout-node--sublayout {
-}
-
-.sublayout-node {
+.tab-panel {
+    width: 100%;
+    height: 100%;
 }
 </style>

@@ -38,16 +38,16 @@ export default {
                         activeComponent: "ExportPanel",
                     },
                 ],
-                orient: "vertical",
+                orient: "v",
 
                 children: [
                     {
-                        components: "ToolPanel",
+                        components: ["ToolPanel"],
                         width: 10,
                         minWidth: 10,
                     },
                     {
-                        orient: "horizontal",
+                        orient: "h",
                         width: 90,
                         minWidth: 10,
                         children: [
@@ -57,12 +57,12 @@ export default {
                                 minHeight: 10,
                                 children: [
                                     {
-                                        components: "PlayBackPanel",
+                                        components: ["PlayBackPanel"],
                                         width: 50,
                                         minWidth: 20,
                                     },
                                     {
-                                        orient: "horizontal",
+                                        orient: "h",
                                         width: 50,
                                         minWidth: 20,
                                         children: [
@@ -78,21 +78,23 @@ export default {
                                                     "PropertyPanel",
                                             },
                                             {
-                                                orient: "vertical",
+                                                orient: "v",
                                                 height: 60,
                                                 minHeight: 10,
                                                 children: [
                                                     {
                                                         width: 30,
                                                         minWidth: 20,
-                                                        components:
+                                                        components: [
                                                             "ColorPanel",
+                                                        ],
                                                     },
                                                     {
                                                         width: 70,
                                                         minWidth: 20,
-                                                        components:
+                                                        components: [
                                                             "DocumentPanel",
+                                                        ],
                                                     },
                                                 ],
                                             },
