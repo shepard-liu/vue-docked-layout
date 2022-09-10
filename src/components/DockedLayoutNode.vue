@@ -328,7 +328,6 @@ export default {
             child.components = grandChild.components;
             child.orient = grandChild.orient;
             this.updateLayoutTree(node);
-            console.log("消除孤子", node.children[index]);
         },
     },
     computed: {
@@ -426,7 +425,6 @@ export default {
                     // 检查是否为孤子结点
                     if (node.children.length === 1) {
                         this.$emit("optimizeNesting", node.children);
-                        return;
                     }
                 }
 
@@ -435,9 +433,9 @@ export default {
             },
         },
     },
-    mounted() {
+    created() {
         const self = this;
-        // 更新整个布局树。
+        // 更新整个布局树的函数
         this.updateLayoutTree = function (node) {
             self.updateLayoutFromNode(self.path, node);
         };
