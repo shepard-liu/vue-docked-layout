@@ -1,11 +1,7 @@
 
 <template>
     <main class="app">
-        <DockedLayout
-            class="main-layout"
-            :layout="layout"
-            @layoutChange="handleLayoutChange"
-        >
+        <DockedLayout class="main-layout" :layout="layout" @layoutChange="handleLayoutChange">
             <div slot="ToolPanel">This is ToolPanel</div>
             <div slot="PlayBackPanel">This is PlayBackPanel</div>
             <div slot="InterpPanel">This is InterpPanel</div>

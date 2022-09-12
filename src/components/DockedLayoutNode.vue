@@ -32,8 +32,19 @@
             'docked-layout-node--floating': floating,
         }"
         :style="floating ? floatingNodeStyle : null"
-        @mousedown="handleFloatingPanelMouseDown"
     >
+        <!-- 若为浮动结点，渲染不可见的窗体伸缩条 -->
+        <div
+            v-if="floating"
+            v-for="resizeBar in floatingPanelResizeBars"
+            :class="resizeBar.className"
+            @mousedown="
+                handleFloatingPanelResizeBarMouseDown(
+                    $event,
+                    resizeBar.resizeFuncs
+                )
+            "
+        ></div>
         <!-- 若为浮动结点，渲染面板控件 -->
         <div
             v-if="floating"
@@ -114,6 +125,7 @@ import { approxEq } from "../utils";
 import { uniqueId } from "../utils/uniqueId";
 import DockedLayoutTabPanel from "./DockedLayoutTabPanel.vue";
 import DockedLayoutSplit from "./DockedLayoutSplit.vue";
+import { panelResizeBarData } from "./DockedLayoutNode.data";
 
 // 判断属性是否被忽略
 function isOmitted(value) {
@@ -126,6 +138,17 @@ function isOmitted(value) {
 // 校验尺寸参数
 function validateSize(value) {
     return typeof value === "number" && value >= 0 && value <= 100;
+}
+/**
+ * 判断一个值x是否位于另一个值y和range确定的范围[y-range, y+range]内
+ * @param {number} x
+ * @param {number} y
+ * @param {number} range 范围
+ * @returns {boolean} 是否位于范围内
+ */
+function isWithinRange(x, y, range) {
+    if (range <= 0) throw new Error("范围不能小于0");
+    return Math.abs(x - y) < range;
 }
 
 const nextId = uniqueId("__docked_layout_node_");
@@ -150,6 +173,18 @@ const orientPropsMap = {
         splitSizeProp: "splitHeight",
         parentSizeProp: "offsetHeight",
     },
+};
+
+// 窗口resize鼠标指针表
+const resizeCursorMap = {
+    left: "ns-resize",
+    right: "ns-resize",
+    top: "ew-resize",
+    bottom: "ew-resize",
+    lefttop: "nw-resize",
+    rightbottom: "nw-resize",
+    leftbottom: "sw-resize",
+    righttop: "sw-resize",
 };
 
 export default {
@@ -178,6 +213,8 @@ export default {
             throttledUpdateLayoutTree: null,
             // 子结点resize过程初始值
             childStartSizes: null,
+            // 浮动面板的窗体resize控制条(数据无需拷贝，因所有结点实例都不会修改其内容)
+            floatingPanelResizeBars: this.floating ? panelResizeBarData : null,
         };
     },
     emits: ["destruct", "optimizeNesting"],
@@ -326,20 +363,48 @@ export default {
                 dockArea: area,
             });
         },
-        // 处理浮动面板鼠标按下事件-在四个角和矩形边响应窗口resize
-        handleFloatingPanelMouseDown(event) {
+        // 处理浮动面板resize条鼠标按下事件-在四个角和矩形边响应窗口resize
+        handleFloatingPanelResizeBarMouseDown(event, resizeFuncs) {
             if (!this.floating) return;
             const nodeElem = this.$refs.node;
-            const {
-                x: nodeX0,
-                y: nodeY0,
-                width: nodeWidth,
-                height: nodeHeight,
-            } = nodeElem.getBoundingClientRect();
+            // 获取窗体坐标信息和鼠标位置信息
+            const { left, top, right, bottom, width, height } =
+                nodeElem.getBoundingClientRect();
             const { clientX: mouseX0, clientY: mouseY0 } = event;
-            // 检测鼠标按下位置是否为浮动窗口四个角点或矩形边
-            // if()
-            event.stopPropagation();
+            // 确定检测范围
+            const detectionRange = 5; // 像素
+
+            // resize方向
+            let direction = "";
+            if (isWithinRange(mouseX0, left, detectionRange)) {
+                resizeFuncs.push(resizeXOnLeft);
+                direction += "left";
+            }
+            if (isWithinRange(mouseX0, right, detectionRange)) {
+                resizeFuncs.push(resizeXOnRight);
+                direction += "right";
+            }
+            if (isWithinRange(mouseY0, top, detectionRange)) {
+                resizeFuncs.push(resizeYOnTop);
+                direction += "top";
+            }
+            if (isWithinRange(mouseY0, bottom, detectionRange)) {
+                resizeFuncs.push(resizeYOnBottom);
+                direction += "bottom";
+            }
+            // 设置禁用用户选择和鼠标方向
+            document.documentElement.style.userSelect = "none";
+            document.documentElement.style.cursor = resizeCursorMap[direction];
+            // 开始监听鼠标移动事件
+            const documentMouseMoveListener = (ev) => {};
+            document.addEventListener("mousemove", documentMouseMoveListener);
+
+            const documentMouseUpListener = (ev) => {
+                // 恢复用户选择和鼠标方向
+                document.documentElement.style.userSelect = null;
+                document.documentElement.style.cursor = null;
+            };
+            document.addEventListener("mouseup", documentMouseUpListener);
         },
         // 处理浮动面板顶栏鼠标按下事件-拖动面板
         handleFloatingPanelTopbarMouseDown(event) {
@@ -599,6 +664,10 @@ export default {
     align-items: center;
 }
 
+/**
+   窗口顶栏控制按钮
+*/
+
 %panelControlBtn {
     height: 12px;
     width: 12px;
@@ -620,5 +689,45 @@ export default {
 .maximize-panel {
     @extend %panelControlBtn;
     background: rgb(43, 200, 64);
+}
+
+/**
+    窗口边缘resize控制条
+*/
+
+%panelResizeBar {
+    position: absolute;
+}
+
+.left-resize {
+    @extend %panelResizeBar;
+}
+
+.right-resize {
+    @extend %panelResizeBar;
+}
+
+.top-resize {
+    @extend %panelResizeBar;
+}
+
+.bottom-resize {
+    @extend %panelResizeBar;
+}
+
+.left-top-resize {
+    @extend %panelResizeBar;
+}
+
+.left-bottom-resize {
+    @extend %panelResizeBar;
+}
+
+.right-top-resize {
+    @extend %panelResizeBar;
+}
+
+.right-bottom-resize {
+    @extend %panelResizeBar;
 }
 </style>
