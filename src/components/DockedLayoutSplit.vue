@@ -22,6 +22,8 @@ export default {
 
             // 临时停用用户选择
             document.documentElement.style.userSelect = "none";
+            document.documentElement.style.cursor =
+                this.orient === "v" ? "col-resize" : "row-resize";
 
             // 是否已emit dragStart事件
             let dragStartFired = false;
@@ -52,6 +54,7 @@ export default {
             const documentMouseUpListener = () => {
                 // 重新启用用户选择
                 document.documentElement.style.userSelect = null;
+                document.documentElement.style.cursor = null;
                 document.removeEventListener(
                     "mousemove",
                     documentMouseMoveListener
@@ -77,11 +80,13 @@ export default {
                       height: "100%",
                       display: "inline-block",
                       cursor: "col-resize",
+                      "--split-scale-hor": "3.0",
                   }
                 : {
                       width: "100%",
                       display: "block",
                       cursor: "row-resize",
+                      "--split-scale-ver": "3.0",
                   };
         },
     },
@@ -96,5 +101,17 @@ export default {
     height: 5px;
     background-color: gray;
     vertical-align: top;
+    position: relative;
+    z-index: 1;
+
+    // 用代码控制以下Custom Properties改变
+    --split-scale-hor: 1;
+    --split-scale-ver: 1;
+
+    transition: transform 200ms ease-in-out;
+
+    &:hover {
+        transform: scale(var(--split-scale-hor), var(--split-scale-ver));
+    }
 }
 </style>

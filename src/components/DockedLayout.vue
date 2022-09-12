@@ -113,26 +113,37 @@ export default {
              * @param {LayoutTreeNode} newNodeLayout 该结点更新后的布局配置
              */
             updateLayoutFromNode(nodePath, newNodeLayout) {
-                // 根节点的更新单独处理
-                if (nodePath.length === 0) {
-                    self.updateLayout(newNodeLayout);
-                    return;
+                if (Array.isArray(nodePath)) {
+                    // 根节点的更新单独处理
+                    if (nodePath.length === 0) {
+                        self.updateLayout(newNodeLayout);
+                        return;
+                    }
+
+                    // 拷贝当前的布局树
+                    const newRootNode = lodash.cloneDeep(self.currentLayout);
+
+                    // 迭代到目标结点的父结点
+                    let currentNode = newRootNode;
+                    for (let i = 0; i < nodePath.length - 1; ++i) {
+                        currentNode = currentNode.children[nodePath[i]];
+                    }
+
+                    // 使用新值覆盖原结点值
+                    currentNode.children[nodePath[nodePath.length - 1]] =
+                        newNodeLayout;
+                    // 更新布局
+                    self.updateLayout(newRootNode);
+                } else if (typeof nodePath === "number") {
+                    // 对于浮动面板
+                    const newRootNode = lodash.cloneDeep(self.currentLayout);
+                    newRootNode.floating[nodePath] = newNodeLayout;
+                    self.updateLayout(newRootNode);
+                } else {
+                    throw new Error(
+                        "DockedLayout: updateLayoutFromNode传入nodePath类型应为Array或number"
+                    );
                 }
-
-                // 拷贝当前的布局树
-                const newRootNode = lodash.cloneDeep(self.currentLayout);
-
-                // 迭代到目标结点的父结点
-                let currentNode = newRootNode;
-                for (let i = 0; i < nodePath.length - 1; ++i) {
-                    currentNode = currentNode.children[nodePath[i]];
-                }
-
-                // 使用新值覆盖原结点值
-                currentNode.children[nodePath[nodePath.length - 1]] =
-                    newNodeLayout;
-                // 更新布局
-                self.updateLayout(newRootNode);
             },
 
             /**

@@ -25,7 +25,25 @@
 
 <template>
     <!-- 若为子布局结点，则渲染子结点 -->
-    <div class="docked-layout-node" ref="node">
+    <div
+        ref="node"
+        :class="{
+            'docked-layout-node': true,
+            'docked-layout-node--floating': floating,
+        }"
+        :style="floating ? floatingNodeStyle : null"
+        @mousedown="handleFloatingPanelMouseDown"
+    >
+        <!-- 若为浮动结点，渲染面板控件 -->
+        <div
+            v-if="floating"
+            class="panel-topbar"
+            @mousedown="handleFloatingPanelTopbarMouseDown"
+        >
+            <div class="close-panel"></div>
+            <div class="minimize-panel"></div>
+            <div class="maximize-panel"></div>
+        </div>
         <!-- 若为组件结点，则渲染Tab面板 -->
         <DockedLayoutTabPanel
             v-if="isComponentNode"
@@ -53,7 +71,7 @@
                 :style="subNodeStyles[index]"
                 :layoutNode="child"
                 :path="childPath(index)"
-                @destruct="handleRemoveSubnode(index)"
+                @destruct="handleRemoveSubnode(false, index)"
                 @optimizeNesting="handleOptimizeNestedChild(index)"
             >
                 <slot
@@ -72,17 +90,21 @@
             />
         </template>
         <!-- 若为根结点，渲染浮动面板 -->
-        <!-- <DockedLayoutNode
+        <DockedLayoutNode
             v-if="isRoot"
             v-for="(child, index) in layoutNodeCache?.floating"
+            :floating="true"
+            :key="child.id || getNextId()"
+            :path="floatingNodePath(index)"
             :layoutNode="child"
+            @destruct="handleRemoveSubnode(true, index)"
         >
             <slot
                 v-for="(_, slotName) in $slots"
                 :name="slotName"
                 :slot="slotName"
             />
-        </DockedLayoutNode> -->
+        </DockedLayoutNode>
     </div>
 </template>
 
@@ -138,8 +160,13 @@ export default {
         layoutNode: Object,
         // 是否为根结点
         isRoot: Boolean,
-        // 当前结点路径码
-        path: Array,
+        /**
+         * 当前结点路径码，布局树内结点为路径序列（数组）
+         * 浮动结点为结点图层位置
+         */
+        path: [Array, Number],
+        // 是否为浮动结点
+        floating: Boolean,
     },
     data() {
         return {
@@ -158,9 +185,13 @@ export default {
         getNextId() {
             return nextId();
         },
-        // 获取子结点的路径码序列
+        // 获取子结点的路径序列
         childPath(index) {
             return [...this.path, index];
+        },
+        // (根节点调用)获取浮动结点的路径码
+        floatingNodePath(index) {
+            return index;
         },
         // 处理分隔条拖动开始事件
         handleSplitDragStart(index, _) {
@@ -295,28 +326,82 @@ export default {
                 dockArea: area,
             });
         },
+        // 处理浮动面板鼠标按下事件-在四个角和矩形边响应窗口resize
+        handleFloatingPanelMouseDown(event) {
+            if (!this.floating) return;
+            const nodeElem = this.$refs.node;
+            const {
+                x: nodeX0,
+                y: nodeY0,
+                width: nodeWidth,
+                height: nodeHeight,
+            } = nodeElem.getBoundingClientRect();
+            const { clientX: mouseX0, clientY: mouseY0 } = event;
+            // 检测鼠标按下位置是否为浮动窗口四个角点或矩形边
+            // if()
+            event.stopPropagation();
+        },
+        // 处理浮动面板顶栏鼠标按下事件-拖动面板
+        handleFloatingPanelTopbarMouseDown(event) {
+            const node = this.layoutNodeCache;
+            // 记录鼠标按下时的坐标
+            const { clientX: x0, clientY: y0 } = event;
+            const top0 = node.top,
+                left0 = node.left;
+            document.documentElement.style.userSelect = "none";
+
+            const documentMouseMoveListener = (ev) => {
+                const { clientX: x, clientY: y } = ev;
+                const layoutElem = this.$refs.node.parentElement;
+                // 获取整体布局的宽高
+                const layoutWidth = layoutElem.clientWidth,
+                    layoutHeight = layoutElem.clientHeight;
+
+                node.top = top0 + ((y - y0) / layoutHeight) * 100;
+                node.left = left0 + ((x - x0) / layoutWidth) * 100;
+            };
+            document.addEventListener("mousemove", documentMouseMoveListener);
+
+            const documentMouseUpListener = (ev) => {
+                document.removeEventListener(
+                    "mousemove",
+                    documentMouseMoveListener
+                );
+                document.removeEventListener(
+                    "mouseup",
+                    documentMouseUpListener
+                );
+                document.documentElement.style.userSelect = null;
+                this.updateLayoutTree(node);
+            };
+            document.addEventListener("mouseup", documentMouseUpListener);
+        },
         // 抛出异常诊断信息
         throwNodeError(msg) {
             console.error(`DockedLayoutNode`, this.layoutNode, "抛出异常");
             throw new Error(msg);
         },
         // 处理子结点移除
-        handleRemoveSubnode(index) {
+        handleRemoveSubnode(floating, index) {
             const node = this.layoutNodeCache;
-            const { mainSizeProp } = orientPropsMap[node.orient];
-            // 移除该结点并获取它的尺寸
-            const removedSize = node.children.splice(index, 1)[0][mainSizeProp]; // prettier-ignore
-            // 将被移除结点尺寸平均分配给其他子结点
-            node.children.forEach((child) => {
-                child[mainSizeProp] += removedSize / node.children.length;
-            });
-            // 若本结点没有子结点，则移除本结点。根节点不受影响
-            if (node.children.length === 0) {
-                this.$emit("destruct");
-                // 布局树更新由父结点完成
-                return;
-            }
 
+            if (floating) {
+                node.floating.splice(index, 1);
+            } else {
+                const { mainSizeProp } = orientPropsMap[node.orient];
+                // 移除该结点并获取它的尺寸
+                const removedSize = node.children.splice(index, 1)[0][mainSizeProp]; // prettier-ignore
+                // 将被移除结点尺寸平均分配给其他子结点
+                node.children.forEach((child) => {
+                    child[mainSizeProp] += removedSize / node.children.length;
+                });
+                // 若本结点没有子结点，则移除本结点。根节点不受影响
+                if (node.children.length === 0) {
+                    this.$emit("destruct");
+                    // 布局树更新由父结点完成
+                    return;
+                }
+            }
             this.updateLayoutTree(node);
         },
         // 处理优化孤子嵌套问题
@@ -393,6 +478,21 @@ export default {
                 [minMainSizeProp]: `calc(${child[minMainSizeProp]}% - ${splitSize} * ${avgCompensateRate})`, // 未指定最小尺寸时默认为10%
             }));
         },
+        // 浮动结点样式表
+        floatingNodeStyle() {
+            if (!this.layoutNodeCache) return {};
+            const { top, left, width, height, minWidth, minHeight, zIndex } =
+                this.layoutNodeCache;
+            return {
+                top: `${top}%` || "0",
+                left: `${left}%` || "0",
+                width: `${width}%` || "25%",
+                height: `${height}%` || "25%",
+                minWidth: `${minWidth}%` || "15%",
+                minHeight: `${minHeight}%` || "15%",
+                zIndex: zIndex || "1",
+            };
+        },
     },
     watch: {
         // 检查布局结点对象是否符合Schema
@@ -417,6 +517,12 @@ export default {
 
                 // 若为子布局结点
                 if (omittedComponents) {
+                    // 若为浮动结点
+                    if (this.floating) {
+                        this.throwNodeError(
+                            "DockerLayoutNode: 浮动布局结点不可作为子布局结点"
+                        );
+                    }
                     // 检查是否指定orient
                     if (node.orient === undefined)
                         this.throwNodeError(
@@ -462,10 +568,57 @@ export default {
 .docked-layout-node {
     border: 1px solid black;
     vertical-align: top;
+    position: relative;
+}
+
+.docked-layout-node--floating {
+    // 覆盖.docked-layout-node的position属性
+    position: absolute;
+
+    display: flex;
+    flex-direction: column;
+
+    & > .tab-panel {
+        // 这将覆盖.tab-panel的height属性，因其父元素为纵向flex容器
+        flex: 1;
+    }
 }
 
 .tab-panel {
     width: 100%;
     height: 100%;
+}
+
+.panel-topbar {
+    height: 25px;
+    padding-left: 5px;
+    background: #888888;
+    cursor: move;
+
+    display: flex;
+    align-items: center;
+}
+
+%panelControlBtn {
+    height: 12px;
+    width: 12px;
+    border-radius: 999px;
+    cursor: pointer;
+    margin-left: 6px;
+    box-shadow: 1px 1px 4px 0 rgba(0, 0, 0, 0.3);
+}
+.close-panel {
+    @extend %panelControlBtn;
+    background: rgb(255, 95, 87);
+}
+
+.minimize-panel {
+    @extend %panelControlBtn;
+    background: rgb(255, 188, 46);
+}
+
+.maximize-panel {
+    @extend %panelControlBtn;
+    background: rgb(43, 200, 64);
 }
 </style>

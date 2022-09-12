@@ -7,6 +7,7 @@ export const testLayout1 = {
             height: 30,
             minWidth: 10,
             minHeight: 10,
+            zIndex: 0,
             components: ["UserPanel", "ExportPanel"],
             activeComponent: "ExportPanel",
         },
