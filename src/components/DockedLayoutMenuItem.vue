@@ -3,6 +3,7 @@
         class="docked-layout-menu-item"
         :data-active="active"
         :data-disabled="disabled"
+        @mousedown="$emit('mouseDown', $event)"
         @click="$emit('click', $event)">
         <slot />
     </div>
@@ -17,7 +18,7 @@ export default {
         // 是否停用
         disabled: Boolean,
     },
-    emits: ["click"],
+    emits: ["click", "mouseDown"],
 };
 </script>
 

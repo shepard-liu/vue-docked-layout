@@ -15,27 +15,23 @@
         @drop="handleDrop"
         @mousedown="$emit('mouseDown', $event)"
         @mouseup="$emit('mouseUp', $event)"
-        @click="$emit('click', $event)"
-    >
+        @click="$emit('click', $event)">
         <slot />
         <div
             @click="handleClickMenu"
             class="icon-menu-wrapper"
-            :data-show="active"
-        >
+            :data-show="active">
             <IconMenu class="icon-menu" />
         </div>
         <DockedLayoutMenu
             class="tabs-menu"
             :show="showTabsMenu && !dragging"
-            :style="{ right: `${menuRightOffset}px` }"
-        >
+            :style="{ right: `${menuRightOffset}px` }">
             <DockedLayoutMenuItem
                 v-for="item in menuItems"
-                @click="$emit(item.emit)"
+                @mouseDown="$emit(item.emit)"
                 :disabled="item.disabled"
-                :key="item.name"
-            >
+                :key="item.name">
                 {{ item.name }}
             </DockedLayoutMenuItem>
         </DockedLayoutMenu>

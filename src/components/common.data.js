@@ -1,0 +1,1 @@
+export const maximumFloatingPanels = 4;

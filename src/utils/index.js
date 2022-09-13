@@ -12,22 +12,22 @@ export function toggleMenu(self, showStateName) {
     if (self[showStateName]) {    // 菜单打开时
         // 暂停用户选择
         document.documentElement.style.userSelect = 'none';
-        // 监听document上的点击事件
-        const documentClickListener = () => {
+        // 监听document上的鼠标按下事件
+        const documentMouseDownListener = (ev) => {
             self[showStateName] = false;
             // 重启用户选择
             document.documentElement.style.userSelect = null;
-            document.removeEventListener('click', documentClickListener);
+            document.removeEventListener('mousedown', documentMouseDownListener);
         }
         /**
          * 本次点击事件会冒泡到document，从而导致刚打开的menu被关闭。
-         * 使用setTimeout异步添加listener可在本次事件销毁后再监听全局click。
+         * 使用setTimeout异步添加listener可在本次事件销毁后再监听全局mousedown。
          * 
          * 不可以直接在前面调用event.stopPropergation()停止冒泡，因为其他menu显示时也会停止冒泡，
          * 导致多个menu同时出现。
          */
         setTimeout(() => {
-            document.addEventListener('click', documentClickListener);
+            document.addEventListener('mousedown', documentMouseDownListener);
         });
     }
 }

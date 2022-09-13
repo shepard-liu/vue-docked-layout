@@ -32,28 +32,23 @@
             'docked-layout-node--floating': floating,
         }"
         :style="floating ? floatingNodeStyle : null"
-    >
+        @mousedown="handleFloatingNodeMouseDown">
         <!-- 若为浮动结点，渲染不可见的窗体伸缩条 -->
         <div
             v-if="floating"
             v-for="resizeBar in floatingPanelResizeBars"
             :class="resizeBar.className"
             @mousedown="
-                handleFloatingPanelResizeBarMouseDown(
-                    $event,
-                    resizeBar.resizeFuncs
-                )
-            "
-        ></div>
+                handleFloatingPanelResizeBarMouseDown($event, resizeBar)
+            " />
         <!-- 若为浮动结点，渲染面板控件 -->
         <div
             v-if="floating"
             class="panel-topbar"
-            @mousedown="handleFloatingPanelTopbarMouseDown"
-        >
-            <div class="close-panel"></div>
-            <div class="minimize-panel"></div>
-            <div class="maximize-panel"></div>
+            @mousedown="handleFloatingPanelTopbarMouseDown">
+            <div class="close-panel" @click="handleDestroyFloatingNode"></div>
+            <div class="minimize-panel" @click="handleMinimizePanel"></div>
+            <div class="maximize-panel" @click="handleMaximizePanel"></div>
         </div>
         <!-- 若为组件结点，则渲染Tab面板 -->
         <DockedLayoutTabPanel
@@ -68,13 +63,11 @@
             @panelDragStart="handlePanelDragStart"
             @panelDropOnNav="handlePanelDrop"
             @panelDropOnDockActionPane="handlePanelDock"
-            class="tab-panel"
-        >
+            class="tab-panel">
             <slot
                 v-for="component in layoutNodeCache?.components"
                 :name="component"
-                :slot="component"
-            />
+                :slot="component" />
         </DockedLayoutTabPanel>
         <template v-else v-for="(child, index) in layoutNodeCache?.children">
             <DockedLayoutNode
@@ -83,13 +76,11 @@
                 :layoutNode="child"
                 :path="childPath(index)"
                 @destruct="handleRemoveSubnode(false, index)"
-                @optimizeNesting="handleOptimizeNestedChild(index)"
-            >
+                @optimizeNesting="handleOptimizeNestedChild(index)">
                 <slot
                     v-for="(_, slotName) in $slots"
                     :name="slotName"
-                    :slot="slotName"
-                />
+                    :slot="slotName" />
             </DockedLayoutNode>
             <!-- 在子结点之间渲染分割条组件 -->
             <DockedLayoutSplit
@@ -97,8 +88,7 @@
                 @splitDragStart="handleSplitDragStart(index, $event)"
                 @splitDrag="handleSplitDrag(index, $event)"
                 @splitDragEnd="handleSplitDragEnd(index, $event)"
-                :orient="layoutNodeCache.orient"
-            />
+                :orient="layoutNodeCache.orient" />
         </template>
         <!-- 若为根结点，渲染浮动面板 -->
         <DockedLayoutNode
@@ -108,13 +98,11 @@
             :key="child.id || getNextId()"
             :path="floatingNodePath(index)"
             :layoutNode="child"
-            @destruct="handleRemoveSubnode(true, index)"
-        >
+            @destruct="handleRemoveSubnode(true, index)">
             <slot
                 v-for="(_, slotName) in $slots"
                 :name="slotName"
-                :slot="slotName"
-            />
+                :slot="slotName" />
         </DockedLayoutNode>
     </div>
 </template>
@@ -126,6 +114,7 @@ import { uniqueId } from "../utils/uniqueId";
 import DockedLayoutTabPanel from "./DockedLayoutTabPanel.vue";
 import DockedLayoutSplit from "./DockedLayoutSplit.vue";
 import { panelResizeBarData } from "./DockedLayoutNode.data";
+import { maximumFloatingPanels } from "./common.data";
 
 // 判断属性是否被忽略
 function isOmitted(value) {
@@ -138,17 +127,6 @@ function isOmitted(value) {
 // 校验尺寸参数
 function validateSize(value) {
     return typeof value === "number" && value >= 0 && value <= 100;
-}
-/**
- * 判断一个值x是否位于另一个值y和range确定的范围[y-range, y+range]内
- * @param {number} x
- * @param {number} y
- * @param {number} range 范围
- * @returns {boolean} 是否位于范围内
- */
-function isWithinRange(x, y, range) {
-    if (range <= 0) throw new Error("范围不能小于0");
-    return Math.abs(x - y) < range;
 }
 
 const nextId = uniqueId("__docked_layout_node_");
@@ -173,18 +151,6 @@ const orientPropsMap = {
         splitSizeProp: "splitHeight",
         parentSizeProp: "offsetHeight",
     },
-};
-
-// 窗口resize鼠标指针表
-const resizeCursorMap = {
-    left: "ns-resize",
-    right: "ns-resize",
-    top: "ew-resize",
-    bottom: "ew-resize",
-    lefttop: "nw-resize",
-    rightbottom: "nw-resize",
-    leftbottom: "sw-resize",
-    righttop: "sw-resize",
 };
 
 export default {
@@ -215,6 +181,8 @@ export default {
             childStartSizes: null,
             // 浮动面板的窗体resize控制条(数据无需拷贝，因所有结点实例都不会修改其内容)
             floatingPanelResizeBars: this.floating ? panelResizeBarData : null,
+            // 浮动面板鼠标按下时是否调用bringPanelToFront置顶
+            doBringToFront: true,
         };
     },
     emits: ["destruct", "optimizeNesting"],
@@ -226,7 +194,7 @@ export default {
         childPath(index) {
             return [...this.path, index];
         },
-        // (根节点调用)获取浮动结点的路径码
+        // (根结点调用)获取浮动结点的路径码
         floatingNodePath(index) {
             return index;
         },
@@ -313,7 +281,12 @@ export default {
             // 布局树更新由父结点完成
         },
         // 浮动特定面板
-        handleFloatPanel({ _, index }) {},
+        handleFloatPanel({ _, index }) {
+            this.floatPanel({
+                fromNodePath: this.path,
+                fromComponentIndex: index,
+            });
+        },
         // 拖动特定面板
         handlePanelDragStart({ component, index }, event) {
             // 拖动操作的文本fallback信息
@@ -364,45 +337,115 @@ export default {
             });
         },
         // 处理浮动面板resize条鼠标按下事件-在四个角和矩形边响应窗口resize
-        handleFloatingPanelResizeBarMouseDown(event, resizeFuncs) {
+        handleFloatingPanelResizeBarMouseDown(event, { className }) {
             if (!this.floating) return;
+            const node = this.layoutNodeCache;
             const nodeElem = this.$refs.node;
-            // 获取窗体坐标信息和鼠标位置信息
-            const { left, top, right, bottom, width, height } =
-                nodeElem.getBoundingClientRect();
+            // 获取窗体坐标信息、鼠标位置信息、浮动窗口结点位置初值
             const { clientX: mouseX0, clientY: mouseY0 } = event;
-            // 确定检测范围
-            const detectionRange = 5; // 像素
-
-            // resize方向
-            let direction = "";
-            if (isWithinRange(mouseX0, left, detectionRange)) {
-                resizeFuncs.push(resizeXOnLeft);
-                direction += "left";
+            const {
+                top: top0,
+                left: left0,
+                width: width0,
+                height: height0,
+            } = node;
+            // 定义XY两个维度上的缩放函数
+            function resizeXOnLeft(deltaX, _) {
+                if (node.width - deltaX < node.minWidth) return;
+                node.left = left0 + deltaX;
+                node.width = width0 - deltaX;
             }
-            if (isWithinRange(mouseX0, right, detectionRange)) {
-                resizeFuncs.push(resizeXOnRight);
-                direction += "right";
+            function resizeXOnRight(deltaX, _) {
+                if (node.width + deltaX < node.minWidth) return;
+                node.width = width0 + deltaX;
             }
-            if (isWithinRange(mouseY0, top, detectionRange)) {
-                resizeFuncs.push(resizeYOnTop);
-                direction += "top";
+            function resizeYOnTop(_, deltaY) {
+                if (node.height - deltaY < node.minHeight) return;
+                node.top = top0 + deltaY;
+                node.height = height0 - deltaY;
             }
-            if (isWithinRange(mouseY0, bottom, detectionRange)) {
-                resizeFuncs.push(resizeYOnBottom);
-                direction += "bottom";
+            function resizeYOnBottom(_, deltaY) {
+                if (node.height + deltaY < node.minHeight) return;
+                node.height = height0 + deltaY;
             }
-            // 设置禁用用户选择和鼠标方向
+            // 创建缩放类型的属性映射
+            const resizePropsMap = {
+                "left-resize": {
+                    cursor: "ew-resize",
+                    resizeFuncs: [resizeXOnLeft],
+                },
+                "right-resize": {
+                    cursor: "ew-resize",
+                    resizeFuncs: [resizeXOnRight],
+                },
+                "top-resize": {
+                    cursor: "ns-resize",
+                    resizeFuncs: [resizeYOnTop],
+                },
+                "bottom-resize": {
+                    cursor: "ns-resize",
+                    resizeFuncs: [resizeYOnBottom],
+                },
+                "left-top-resize": {
+                    cursor: "nw-resize",
+                    resizeFuncs: [resizeXOnLeft, resizeYOnTop],
+                },
+                "left-bottom-resize": {
+                    cursor: "ne-resize",
+                    resizeFuncs: [resizeXOnLeft, resizeYOnBottom],
+                },
+                "right-top-resize": {
+                    cursor: "ne-resize",
+                    resizeFuncs: [resizeXOnRight, resizeYOnTop],
+                },
+                "right-bottom-resize": {
+                    cursor: "nw-resize",
+                    resizeFuncs: [resizeXOnRight, resizeYOnBottom],
+                },
+            };
+            // 获取当前的resize类型
+            const { cursor, resizeFuncs } = resizePropsMap[className];
+            // 禁用用户选择、设置鼠标指针，临时设置窗口zIndex
             document.documentElement.style.userSelect = "none";
-            document.documentElement.style.cursor = resizeCursorMap[direction];
+            document.documentElement.style.cursor = cursor;
+            nodeElem.style.zIndex = "99999";
+            this.doBringToFront = false;
+
             // 开始监听鼠标移动事件
-            const documentMouseMoveListener = (ev) => {};
+            const documentMouseMoveListener = (ev) => {
+                // 获取当前鼠标坐标
+                const { clientX: mouseX, clientY: mouseY } = ev;
+                // 获取当前根结点宽高
+                const { clientWidth: layoutWidth, clientHeight: layoutHeight } =
+                    nodeElem.parentElement;
+                // 计算改变量
+                const deltaX = ((mouseX - mouseX0) / layoutWidth) * 100,
+                    deltaY = ((mouseY - mouseY0) / layoutHeight) * 100;
+                // 应用改变
+                for (const fn of resizeFuncs) {
+                    fn(deltaX, deltaY);
+                }
+            };
             document.addEventListener("mousemove", documentMouseMoveListener);
 
-            const documentMouseUpListener = (ev) => {
+            const documentMouseUpListener = () => {
+                // 取消监听器
+                document.removeEventListener(
+                    "mousemove",
+                    documentMouseMoveListener
+                );
+                document.removeEventListener(
+                    "mouseup",
+                    documentMouseUpListener
+                );
                 // 恢复用户选择和鼠标方向
                 document.documentElement.style.userSelect = null;
                 document.documentElement.style.cursor = null;
+                nodeElem.style.zIndex = null;
+                this.doBringToFront = true;
+
+                // 更新布局树
+                this.bringPanelToFront(this.path, node);
             };
             document.addEventListener("mouseup", documentMouseUpListener);
         },
@@ -413,21 +456,26 @@ export default {
             const { clientX: x0, clientY: y0 } = event;
             const top0 = node.top,
                 left0 = node.left;
+            // 停用用户选择
             document.documentElement.style.userSelect = "none";
+            // 暂停浮动面板zIndex调整
+            this.doBringToFront = false;
+            // 调整zIndex，置顶本结点
+            this.$refs.node.style.zIndex = "99999";
 
             const documentMouseMoveListener = (ev) => {
                 const { clientX: x, clientY: y } = ev;
                 const layoutElem = this.$refs.node.parentElement;
                 // 获取整体布局的宽高
-                const layoutWidth = layoutElem.clientWidth,
-                    layoutHeight = layoutElem.clientHeight;
+                const { clientWidth: layoutWidth, clientHeight: layoutHeight } =
+                    layoutElem;
 
                 node.top = top0 + ((y - y0) / layoutHeight) * 100;
                 node.left = left0 + ((x - x0) / layoutWidth) * 100;
             };
             document.addEventListener("mousemove", documentMouseMoveListener);
 
-            const documentMouseUpListener = (ev) => {
+            const documentMouseUpListener = () => {
                 document.removeEventListener(
                     "mousemove",
                     documentMouseMoveListener
@@ -437,10 +485,28 @@ export default {
                     documentMouseUpListener
                 );
                 document.documentElement.style.userSelect = null;
-                this.updateLayoutTree(node);
+                // 恢复zIndex
+                this.$refs.node.style.zIndex = null;
+                // 恢复浮动面板zIndex调整
+                this.doBringToFront = true;
+                this.bringPanelToFront(this.path, node);
             };
             document.addEventListener("mouseup", documentMouseUpListener);
         },
+        // 处理浮动结点鼠标按下事件
+        handleFloatingNodeMouseDown() {
+            if (this.floating === false || this.doBringToFront === false)
+                return;
+            this.bringPanelToFront(this.path);
+        },
+        // 处理关闭浮动面板
+        handleDestroyFloatingNode(event) {
+            this.$emit("destruct");
+            event.stopPropagation();
+            console.log("remove");
+        },
+        handleMaximizePanel() {},
+        handleMinimizePanel() {},
         // 抛出异常诊断信息
         throwNodeError(msg) {
             console.error(`DockedLayoutNode`, this.layoutNode, "抛出异常");
@@ -460,7 +526,7 @@ export default {
                 node.children.forEach((child) => {
                     child[mainSizeProp] += removedSize / node.children.length;
                 });
-                // 若本结点没有子结点，则移除本结点。根节点不受影响
+                // 若本结点没有子结点，则移除本结点。根结点不受影响
                 if (node.children.length === 0) {
                     this.$emit("destruct");
                     // 布局树更新由父结点完成
@@ -545,9 +611,18 @@ export default {
         },
         // 浮动结点样式表
         floatingNodeStyle() {
-            if (!this.layoutNodeCache) return {};
+            if (!this.layoutNodeCache || !this.floating) return {};
             const { top, left, width, height, minWidth, minHeight, zIndex } =
                 this.layoutNodeCache;
+            if (
+                zIndex < 1 ||
+                zIndex > maximumFloatingPanels ||
+                Number.isInteger(zIndex) === false
+            ) {
+                this.throwNodeError(
+                    `结点zIndex需要指定为1~${maximumFloatingPanels}间的整数值，该结点:${zIndex}`
+                );
+            }
             return {
                 top: `${top}%` || "0",
                 left: `${left}%` || "0",
@@ -575,7 +650,7 @@ export default {
                         `布局结点不可同时指定children和components属性。`
                     );
                 } else if (omittedChildren && omittedComponents) {
-                    // 该节点为空节点，自毁
+                    // 该结点为空结点，自毁
                     this.$emit("destruct");
                     return;
                 }
@@ -584,18 +659,23 @@ export default {
                 if (omittedComponents) {
                     // 若为浮动结点
                     if (this.floating) {
-                        this.throwNodeError(
-                            "DockerLayoutNode: 浮动布局结点不可作为子布局结点"
-                        );
+                        this.throwNodeError("浮动布局结点不可作为子布局结点");
                     }
                     // 检查是否指定orient
                     if (node.orient === undefined)
-                        this.throwNodeError(
-                            "DockerLayoutNode: 子布局结点未指定orient属性"
-                        );
+                        this.throwNodeError("子布局结点未指定orient属性");
                     // 检查是否为孤子结点
                     if (node.children.length === 1) {
                         this.$emit("optimizeNesting", node.children);
+                    }
+                }
+
+                if (this.isRoot && Array.isArray(node.floating)) {
+                    // 检查浮动窗口个数是否超过上限
+                    if (node.floating.length > maximumFloatingPanels) {
+                        this.throwNodeError(
+                            `浮动窗口数量超过上限${maximumFloatingPanels}`
+                        );
                     }
                 }
 
@@ -623,6 +703,10 @@ export default {
         setPanelDndDataType: "setPanelDndDataType",
         // 校验数据标记是否为本系统提供
         validatePanelDndDataType: "validatePanelDndDataType",
+        // 浮动面板
+        floatPanel: "floatPanel",
+        // 调整浮动面板zIndex
+        bringPanelToFront: "bringPanelToFront",
     },
 };
 </script>
@@ -676,6 +760,7 @@ export default {
     margin-left: 6px;
     box-shadow: 1px 1px 4px 0 rgba(0, 0, 0, 0.3);
 }
+
 .close-panel {
     @extend %panelControlBtn;
     background: rgb(255, 95, 87);
@@ -694,40 +779,83 @@ export default {
 /**
     窗口边缘resize控制条
 */
+$resizeBarSize: var(--docked-layout-panel-resize-bar-size, 5px);
 
 %panelResizeBar {
     position: absolute;
+    // 窗口resize条应在窗口上方
+    z-index: 999;
 }
 
 .left-resize {
     @extend %panelResizeBar;
+    top: $resizeBarSize;
+    bottom: $resizeBarSize;
+    left: calc(0px - $resizeBarSize);
+    width: calc($resizeBarSize * 2);
+    cursor: ew-resize;
 }
 
 .right-resize {
     @extend %panelResizeBar;
+    top: $resizeBarSize;
+    bottom: $resizeBarSize;
+    right: calc(0px - $resizeBarSize);
+    width: calc($resizeBarSize * 2);
+    cursor: ew-resize;
 }
 
 .top-resize {
     @extend %panelResizeBar;
+    top: calc(0px - $resizeBarSize);
+    left: $resizeBarSize;
+    right: $resizeBarSize;
+    height: calc($resizeBarSize * 2);
+    cursor: ns-resize;
 }
 
 .bottom-resize {
     @extend %panelResizeBar;
+    bottom: calc(0px - $resizeBarSize);
+    left: $resizeBarSize;
+    right: $resizeBarSize;
+    height: calc($resizeBarSize * 2);
+    cursor: ns-resize;
 }
 
 .left-top-resize {
     @extend %panelResizeBar;
+    left: calc(0px - $resizeBarSize);
+    top: calc(0px - $resizeBarSize);
+    width: calc($resizeBarSize * 2);
+    height: calc($resizeBarSize * 2);
+    cursor: nw-resize;
 }
 
 .left-bottom-resize {
     @extend %panelResizeBar;
+    left: calc(0px - $resizeBarSize);
+    bottom: calc(0px - $resizeBarSize);
+    width: calc($resizeBarSize * 2);
+    height: calc($resizeBarSize * 2);
+    cursor: ne-resize;
 }
 
 .right-top-resize {
     @extend %panelResizeBar;
+    right: calc(0px - $resizeBarSize);
+    top: calc(0px - $resizeBarSize);
+    width: calc($resizeBarSize * 2);
+    height: calc($resizeBarSize * 2);
+    cursor: ne-resize;
 }
 
 .right-bottom-resize {
     @extend %panelResizeBar;
+    right: calc(0px - $resizeBarSize);
+    bottom: calc(0px - $resizeBarSize);
+    width: calc($resizeBarSize * 2);
+    height: calc($resizeBarSize * 2);
+    cursor: nw-resize;
 }
 </style>

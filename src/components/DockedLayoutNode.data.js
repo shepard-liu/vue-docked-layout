@@ -3,51 +3,38 @@
  * 数据文件
  */
 
-// 浮动节点尺寸调整函数组，定义窗体XY两个维度上的resize函数
-function resizeXOnLeft(node, value) {
-    node.left += value;
-    node.width -= value;
-}
-function resizeXOnRight(node, value) {
-    node.width += value;
-}
-function resizeYOnTop(node, value) {
-    node.top += value;
-    node.height -= value;
-}
-function resizeYOnBottom(node, value) {
-    node.height += value;
-}
-
 // 浮动窗口resize条数据
 export const panelResizeBarData = [
     {
         className: "left-resize",
-        resizeFuncs: [resizeXOnLeft],
+        cursor: 'ew-resize',
     },
     {
         className: "right-resize",
-        resizeFuncs: [resizeXOnRight],
+        cursor: 'ew-resize',
     },
-    { className: "top-resize", resizeFuncs: [resizeYOnTop] },
+    {
+        className: "top-resize",
+        cursor: 'ns-resize',
+    },
     {
         className: "bottom-resize",
-        resizeFuncs: [resizeYOnBottom],
+        cursor: 'ns-resize',
     },
     {
         className: "left-top-resize",
-        resizeFuncs: [resizeXOnLeft, resizeYOnTop],
+        cursor: 'nw-resize'
     },
     {
         className: "left-bottom-resize",
-        resizeFuncs: [resizeXOnLeft, resizeYOnBottom],
+        cursor: 'ne-resize'
     },
     {
         className: "right-top-resize",
-        resizeFuncs: [resizeXOnRight, resizeYOnTop],
+        cursor: 'ne-resize'
     },
     {
         className: "right-bottom-resize",
-        resizeFuncs: [resizeXOnRight, resizeYOnBottom],
+        cursor: 'nw-resize'
     },
 ]

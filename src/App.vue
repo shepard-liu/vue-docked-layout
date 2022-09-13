@@ -1,7 +1,10 @@
 
 <template>
     <main class="app">
-        <DockedLayout class="main-layout" :layout="layout" @layoutChange="handleLayoutChange">
+        <DockedLayout
+            class="main-layout"
+            :layout="layout"
+            @layoutChange="handleLayoutChange">
             <div slot="ToolPanel">This is ToolPanel</div>
             <div slot="PlayBackPanel">This is PlayBackPanel</div>
             <div slot="InterpPanel">This is InterpPanel</div>
@@ -12,6 +15,8 @@
             <div slot="TimelinePanel">This is TimelinePanel</div>
             <div slot="EffectsPanel">This is EffectsPanel</div>
             <div slot="UserPanel">This is UserPanel</div>
+            <div slot="PreferencesPanel">This is PreferencesPanel</div>
+            <div slot="MusicPanel">This is MusicPanel</div>
             <div slot="ExportPanel">This is ExportPanel</div>
             <div slot="CutScenePanel">This is CutScenePanel</div>
             <div slot="RendererPanel">This is RendererPanel</div>

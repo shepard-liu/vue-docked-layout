@@ -4,13 +4,11 @@
             class="layout-root-node"
             :layoutNode="currentLayout"
             :isRoot="true"
-            :path="[]"
-        >
+            :path="[]">
             <slot
                 v-for="(_, slotName) in $slots"
                 :name="slotName"
-                :slot="slotName"
-            ></slot>
+                :slot="slotName"></slot>
         </DockedLayoutNode>
     </div>
 </template>
@@ -18,6 +16,7 @@
 <script>
 import DockedLayoutNode from "./DockedLayoutNode.vue";
 import lodash from "lodash";
+import { maximumFloatingPanels } from "./common.data";
 
 // 校验布局配置对象类型
 function validateLayoutObjectType(o) {
@@ -100,7 +99,35 @@ export default {
     provide() {
         const self = this;
 
+        // 浮动窗口调整zIndex的核心函数，该函数不会更新布局树
+        function __bringPanelToFront(root, index) {
+            const floatingPanels = root.floating;
+            // 使用zIndex从 1 ~ maximumFloatingPanels 的数值
+            const curMax = floatingPanels
+                .map((panel) => panel.zIndex)
+                .reduce((prev, cur) => (cur > prev ? cur : prev));
+            if (curMax === maximumFloatingPanels) {
+                // 暂用0占位
+                floatingPanels[index].zIndex = 0;
+                // 获取按元素排序后的数组下标
+                const sortedIndexes = Array.from(
+                    Array(floatingPanels.length).keys()
+                ).sort(
+                    (a, b) =>
+                        floatingPanels[a].zIndex - floatingPanels[b].zIndex
+                );
+                // 紧密排列zIndex
+                for (let i = 1; i < sortedIndexes.length; ++i)
+                    floatingPanels[sortedIndexes[i]].zIndex = i;
+
+                floatingPanels[index].zIndex = floatingPanels.length;
+            } else {
+                floatingPanels[index].zIndex = curMax + 1;
+            }
+        }
+
         const { children, orient, ...otherProps } = self.currentLayout || {};
+
         const provideObject = {
             // 向子组件传递布局配置
             layoutConfig: otherProps,
@@ -109,12 +136,12 @@ export default {
              * 布局更新函数
              *
              * 该函数将完全更新整个布局树，请谨慎调用。
-             * @param {number[]} nodePath 结点从树根节点访问的路径
+             * @param {number[]} nodePath 结点从树根结点访问的路径
              * @param {LayoutTreeNode} newNodeLayout 该结点更新后的布局配置
              */
             updateLayoutFromNode(nodePath, newNodeLayout) {
                 if (Array.isArray(nodePath)) {
-                    // 根节点的更新单独处理
+                    // 根结点的更新单独处理
                     if (nodePath.length === 0) {
                         self.updateLayout(newNodeLayout);
                         return;
@@ -164,7 +191,7 @@ export default {
                 // 拷贝当前的布局树
                 const newRootNode = lodash.cloneDeep(self.currentLayout);
 
-                // 获取拖拽源节点和目标结点
+                // 获取拖拽源结点和目标结点
                 const fromNode = self.getNodeLayoutFromPath(
                     newRootNode,
                     fromNodePath
@@ -217,7 +244,7 @@ export default {
                 // 拷贝当前的布局树
                 const newRootNode = lodash.cloneDeep(self.currentLayout);
 
-                // 获取拖拽源节点
+                // 获取拖拽源结点
                 const fromNode = self.getNodeLayoutFromPath(
                     newRootNode,
                     fromNodePath
@@ -266,7 +293,7 @@ export default {
                             toNode[childSizeProp] / 2);
                         const childMinSize = (toNode[childMinSizeProp] =
                             toNode[childMinSizeProp] / 2);
-                        // 在toNode的父节点的children中插入新的子结点
+                        // 在toNode的父结点的children中插入新的子结点
                         const insertAfter =
                             dockArea === "below" || dockArea === "right";
                         toNodeParentNode.children.splice(
@@ -314,6 +341,63 @@ export default {
                     self.updateLayout(newRootNodeSecUpdate);
                 });
                 // 第一次更新：从布局树中删除fromComponent
+                self.updateLayout(newRootNode);
+            },
+
+            // 浮动面板
+            floatPanel({ fromNodePath, fromComponentIndex }) {
+                const newRootNode = lodash.cloneDeep(self.currentLayout);
+                // 获取拖拽源结点
+                const fromNode = self.getNodeLayoutFromPath(
+                    newRootNode,
+                    fromNodePath
+                );
+
+                // 从源结点删除面板并获取组件名
+                const fromComponent = fromNode.components.splice(
+                    fromComponentIndex,
+                    1
+                )[0];
+
+                // 创建新的浮动结点
+                if (Array.isArray(newRootNode.floating) === false)
+                    newRootNode.floating = [];
+                // 限制浮动结点个数
+                if (newRootNode.floating.length === maximumFloatingPanels) {
+                    console.warn(
+                        `DockedLayout: 浮动窗口个数上限(${maximumFloatingPanels})已达到，无法继续添加浮动窗口`
+                    );
+                    return;
+                }
+
+                newRootNode.floating.push({
+                    top: 0,
+                    left: 0,
+                    width: 20,
+                    height: 20,
+                    minWidth: 10,
+                    minHeight: 10,
+                    components: [fromComponent],
+                });
+
+                // 将新加入的浮动面板放置于最前
+                __bringPanelToFront(
+                    newRootNode,
+                    newRootNode.floating.length - 1
+                );
+
+                self.updateLayout(newRootNode);
+            },
+
+            /**
+             * 调整浮动面板到最前
+             * @param {number} index 浮动结点的在floating中的下标
+             * @param {LayoutNode} node （可选参数）浮动结点，若指定，将同时更新结点配置对象
+             */
+            bringPanelToFront(index, node) {
+                const newRootNode = lodash.cloneDeep(self.currentLayout);
+                if (node) newRootNode.floating[index] = node;
+                __bringPanelToFront(newRootNode, index);
                 self.updateLayout(newRootNode);
             },
 
