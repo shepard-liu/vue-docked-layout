@@ -32,38 +32,34 @@
             'docked-layout-node--floating': floating,
         }"
         :style="floating ? floatingNodeStyle : null"
-        @mousedown="handleFloatingNodeMouseDown"
-    >
+        @mousedown="handleFloatingNodeMouseDown">
         <!-- 若为浮动结点，渲染不可见的窗体伸缩条 -->
-        <div
-            v-if="floating && !maximized"
-            v-for="resizeBar in floatingPanelResizeBars"
-            :class="resizeBar.className"
-            @mousedown="
-                handleFloatingPanelResizeBarMouseDown($event, resizeBar)
-            "
-        />
+        <template v-if="floating && !maximized">
+            <div
+                v-for="resizeBar in floatingPanelResizeBars"
+                :class="resizeBar.className"
+                :key="resizeBar.className"
+                @mousedown="
+                    handleFloatingPanelResizeBarMouseDown($event, resizeBar)
+                " />
+        </template>
         <!-- 若为浮动结点，渲染面板控件 -->
         <div
             v-if="floating"
             class="panel-topbar"
-            @mousedown="handleFloatingPanelTopbarMouseDown"
-        >
+            @mousedown="handleFloatingPanelTopbarMouseDown">
             <div
                 class="close-panel"
                 @mousedown="$event.stopPropagation()"
-                @click="handleDestroyFloatingNode"
-            ></div>
+                @click="handleDestroyFloatingNode"></div>
             <div
                 class="minimize-panel"
                 @mousedown="$event.stopPropagation()"
-                @click="handleMinimizePanel"
-            ></div>
+                @click="handleMinimizePanel"></div>
             <div
                 class="maximize-panel"
                 @mousedown="$event.stopPropagation()"
-                @click="handleMaximizePanel"
-            ></div>
+                @click="handleMaximizePanel"></div>
         </div>
         <!-- 若为组件结点，则渲染Tab面板 -->
         <DockedLayoutTabPanel
@@ -79,13 +75,11 @@
             @panelDragStart="handlePanelDragStart"
             @panelDropOnNav="handlePanelDrop"
             @panelDropOnDockActionPane="handlePanelDock"
-            class="tab-panel"
-        >
+            class="tab-panel">
             <slot
                 v-for="component in layoutNodeCache?.components"
                 :name="component"
-                :slot="component"
-            />
+                :slot="component" />
         </DockedLayoutTabPanel>
         <template v-else v-for="(child, index) in layoutNodeCache?.children">
             <DockedLayoutNode
@@ -94,13 +88,11 @@
                 :layoutNode="child"
                 :path="childPath(index)"
                 @destruct="handleRemoveSubnode(false, index)"
-                @optimizeNesting="handleOptimizeNestedChild(index)"
-            >
+                @optimizeNesting="handleOptimizeNestedChild(index)">
                 <slot
                     v-for="(_, slotName) in $slots"
                     :name="slotName"
-                    :slot="slotName"
-                />
+                    :slot="slotName" />
             </DockedLayoutNode>
             <!-- 在子结点之间渲染分割条组件 -->
             <DockedLayoutSplit
@@ -108,8 +100,7 @@
                 @splitDragStart="handleSplitDragStart(index, $event)"
                 @splitDrag="handleSplitDrag(index, $event)"
                 @splitDragEnd="handleSplitDragEnd(index, $event)"
-                :orient="layoutNodeCache.orient"
-            />
+                :orient="layoutNodeCache.orient" />
         </template>
         <!-- 若为根结点，渲染浮动面板 -->
         <DockedLayoutNode
@@ -119,13 +110,11 @@
             :key="child.id || getNextId()"
             :path="floatingNodePath(index)"
             :layoutNode="child"
-            @destruct="handleRemoveSubnode(true, index)"
-        >
+            @destruct="handleRemoveSubnode(true, index)">
             <slot
                 v-for="(_, slotName) in $slots"
                 :name="slotName"
-                :slot="slotName"
-            />
+                :slot="slotName" />
         </DockedLayoutNode>
     </div>
 </template>

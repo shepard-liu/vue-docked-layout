@@ -4,13 +4,11 @@
             class="layout-root-node"
             :layoutNode="currentLayout"
             :isRoot="true"
-            :path="[]"
-        >
+            :path="[]">
             <slot
                 v-for="(_, slotName) in $slots"
                 :name="slotName"
-                :slot="slotName"
-            ></slot>
+                :slot="slotName"></slot>
         </DockedLayoutNode>
     </div>
 </template>
@@ -408,9 +406,26 @@ export default {
              */
             bringPanelToFront(index, node) {
                 const newRootNode = lodash.cloneDeep(self.currentLayout);
-                if (node) newRootNode.floating[index] = node;
-                __bringPanelToFront(newRootNode, index);
-                self.updateLayout(newRootNode);
+                let mutated = false;
+                if (node) {
+                    newRootNode.floating[index] = node;
+                    mutated = true;
+                }
+                // 判断是否已经置顶
+                let maxIndex = 0,
+                    curMax = -1;
+                newRootNode.floating.forEach((node, idx) => {
+                    if (node.zIndex > curMax) {
+                        curMax = node.zIndex;
+                        maxIndex = idx;
+                    }
+                });
+                if (maxIndex !== index) {
+                    __bringPanelToFront(newRootNode, index);
+                    mutated = true;
+                }
+                // 仅在进行操作后更新布局树
+                if (mutated) self.updateLayout(newRootNode);
             },
 
             /**
