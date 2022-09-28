@@ -15,23 +15,28 @@
         @drop="handleDrop"
         @mousedown="$emit('mouseDown', $event)"
         @mouseup="$emit('mouseUp', $event)"
-        @click="$emit('click', $event)">
+        @click="$emit('click', $event)"
+    >
         <slot />
         <div
+            @mousedown="$event.stopPropagation()"
             @click="handleClickMenu"
             class="icon-menu-wrapper"
-            :data-show="active">
+            :data-show="active"
+        >
             <IconMenu class="icon-menu" />
         </div>
         <DockedLayoutMenu
             class="tabs-menu"
             :show="showTabsMenu && !dragging"
-            :style="{ right: `${menuRightOffset}px` }">
+            :style="{ right: `${menuRightOffset}px` }"
+        >
             <DockedLayoutMenuItem
                 v-for="item in menuItems"
-                @mouseDown="$emit(item.emit)"
+                @mouseDown="handleMenuItemMouseDown(item)"
                 :disabled="item.disabled"
-                :key="item.name">
+                :key="item.name"
+            >
                 {{ item.name }}
             </DockedLayoutMenuItem>
         </DockedLayoutMenu>
@@ -50,6 +55,8 @@ export default {
         active: Boolean,
         // 菜单操作“关闭面板组其他面板是否可用”
         canCloseOtherPanels: Boolean,
+        // 是否为浮动窗口的tab
+        floating: Boolean,
     },
     data() {
         return {
@@ -69,20 +76,21 @@ export default {
             return [
                 {
                     name: "关闭面板",
-                    emit: "closePanel",
+                    emitMessage: "closePanel",
                 },
                 {
                     name: "浮动面板",
-                    emit: "floatPanel",
+                    emitMessage: "floatPanel",
+                    disabled: this.floating,
                 },
                 {
                     name: "关闭面板组其他面板",
-                    emit: "closeOtherPanels",
+                    emitMessage: "closeOtherPanels",
                     disabled: !this.canCloseOtherPanels,
                 },
                 {
                     name: "关闭面板组",
-                    emit: "closePanelGroup",
+                    emitMessage: "closePanelGroup",
                 },
             ];
         },
@@ -100,16 +108,22 @@ export default {
                 tabElem.offsetWidth;
             toggleMenu(this, "showTabsMenu");
         },
+        // 处理点击菜单项
+        handleMenuItemMouseDown({ disabled, emitMessage }) {
+            if (!disabled) this.$emit(emitMessage);
+        },
         // 处理拖动开始
         handleDragStart(event) {
             this.dragging = true;
             event.dataTransfer.effectAllowed = "move";
             this.$emit("dragStart", event);
+            this.enablePanelInteraction(false);
         },
         // 处理拖动结束
         handleDragEnd(event) {
             this.dragging = false;
             this.$emit("dragEnd", event);
+            this.enablePanelInteraction(true);
         },
         // 处理拖动进入
         handleDragEnter(event) {
@@ -165,6 +179,7 @@ export default {
     components: { IconMenu, DockedLayoutMenu, DockedLayoutMenuItem },
     inject: {
         validatePanelDndDataType: "validatePanelDndDataType",
+        enablePanelInteraction: "enablePanelInteraction",
     },
 };
 </script>

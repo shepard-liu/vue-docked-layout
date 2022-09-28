@@ -32,28 +32,44 @@
             'docked-layout-node--floating': floating,
         }"
         :style="floating ? floatingNodeStyle : null"
-        @mousedown="handleFloatingNodeMouseDown">
+        @mousedown="handleFloatingNodeMouseDown"
+    >
         <!-- 若为浮动结点，渲染不可见的窗体伸缩条 -->
         <div
-            v-if="floating"
+            v-if="floating && !maximized"
             v-for="resizeBar in floatingPanelResizeBars"
             :class="resizeBar.className"
             @mousedown="
                 handleFloatingPanelResizeBarMouseDown($event, resizeBar)
-            " />
+            "
+        />
         <!-- 若为浮动结点，渲染面板控件 -->
         <div
             v-if="floating"
             class="panel-topbar"
-            @mousedown="handleFloatingPanelTopbarMouseDown">
-            <div class="close-panel" @click="handleDestroyFloatingNode"></div>
-            <div class="minimize-panel" @click="handleMinimizePanel"></div>
-            <div class="maximize-panel" @click="handleMaximizePanel"></div>
+            @mousedown="handleFloatingPanelTopbarMouseDown"
+        >
+            <div
+                class="close-panel"
+                @mousedown="$event.stopPropagation()"
+                @click="handleDestroyFloatingNode"
+            ></div>
+            <div
+                class="minimize-panel"
+                @mousedown="$event.stopPropagation()"
+                @click="handleMinimizePanel"
+            ></div>
+            <div
+                class="maximize-panel"
+                @mousedown="$event.stopPropagation()"
+                @click="handleMaximizePanel"
+            ></div>
         </div>
         <!-- 若为组件结点，则渲染Tab面板 -->
         <DockedLayoutTabPanel
             v-if="isComponentNode"
             :components="layoutNodeCache?.components"
+            :floating="floating"
             :activeComponent="layoutNodeCache.activeComponent"
             @activeChange="handleTabActiveChange"
             @closePanel="handleClosePanel"
@@ -63,11 +79,13 @@
             @panelDragStart="handlePanelDragStart"
             @panelDropOnNav="handlePanelDrop"
             @panelDropOnDockActionPane="handlePanelDock"
-            class="tab-panel">
+            class="tab-panel"
+        >
             <slot
                 v-for="component in layoutNodeCache?.components"
                 :name="component"
-                :slot="component" />
+                :slot="component"
+            />
         </DockedLayoutTabPanel>
         <template v-else v-for="(child, index) in layoutNodeCache?.children">
             <DockedLayoutNode
@@ -76,11 +94,13 @@
                 :layoutNode="child"
                 :path="childPath(index)"
                 @destruct="handleRemoveSubnode(false, index)"
-                @optimizeNesting="handleOptimizeNestedChild(index)">
+                @optimizeNesting="handleOptimizeNestedChild(index)"
+            >
                 <slot
                     v-for="(_, slotName) in $slots"
                     :name="slotName"
-                    :slot="slotName" />
+                    :slot="slotName"
+                />
             </DockedLayoutNode>
             <!-- 在子结点之间渲染分割条组件 -->
             <DockedLayoutSplit
@@ -88,7 +108,8 @@
                 @splitDragStart="handleSplitDragStart(index, $event)"
                 @splitDrag="handleSplitDrag(index, $event)"
                 @splitDragEnd="handleSplitDragEnd(index, $event)"
-                :orient="layoutNodeCache.orient" />
+                :orient="layoutNodeCache.orient"
+            />
         </template>
         <!-- 若为根结点，渲染浮动面板 -->
         <DockedLayoutNode
@@ -98,11 +119,13 @@
             :key="child.id || getNextId()"
             :path="floatingNodePath(index)"
             :layoutNode="child"
-            @destruct="handleRemoveSubnode(true, index)">
+            @destruct="handleRemoveSubnode(true, index)"
+        >
             <slot
                 v-for="(_, slotName) in $slots"
                 :name="slotName"
-                :slot="slotName" />
+                :slot="slotName"
+            />
         </DockedLayoutNode>
     </div>
 </template>
@@ -114,7 +137,7 @@ import { uniqueId } from "../utils/uniqueId";
 import DockedLayoutTabPanel from "./DockedLayoutTabPanel.vue";
 import DockedLayoutSplit from "./DockedLayoutSplit.vue";
 import { panelResizeBarData } from "./DockedLayoutNode.data";
-import { maximumFloatingPanels } from "./common.data";
+import { draggingPanel, maximumFloatingPanels } from "./common.data";
 
 // 判断属性是否被忽略
 function isOmitted(value) {
@@ -183,6 +206,8 @@ export default {
             floatingPanelResizeBars: this.floating ? panelResizeBarData : null,
             // 浮动面板鼠标按下时是否调用bringPanelToFront置顶
             doBringToFront: true,
+            // 是否最大化
+            maximized: false,
         };
     },
     emits: ["destruct", "optimizeNesting"],
@@ -298,6 +323,22 @@ export default {
             // 添加数据标记
             this.setPanelDndDataType(event);
 
+            // 设置拖拽信息全局变量
+            draggingPanel.current = {
+                nodePath: this.path,
+                component,
+                componentIndex: index,
+            };
+            // 监听document的鼠标释放事件，清除拖拽信息全局变量
+            const documentMouseUpListener = () => {
+                draggingPanel.current = null;
+                document.removeEventListener(
+                    "mouseup",
+                    documentMouseUpListener
+                );
+            };
+            document.addEventListener("mouseup", documentMouseUpListener);
+
             // 拖动操作的数据
             event.dataTransfer.setData(
                 "panel",
@@ -387,26 +428,26 @@ export default {
                     resizeFuncs: [resizeYOnBottom],
                 },
                 "left-top-resize": {
-                    cursor: "nw-resize",
+                    cursor: "nwse-resize",
                     resizeFuncs: [resizeXOnLeft, resizeYOnTop],
                 },
                 "left-bottom-resize": {
-                    cursor: "ne-resize",
+                    cursor: "nesw-resize",
                     resizeFuncs: [resizeXOnLeft, resizeYOnBottom],
                 },
                 "right-top-resize": {
-                    cursor: "ne-resize",
+                    cursor: "nesw-resize",
                     resizeFuncs: [resizeXOnRight, resizeYOnTop],
                 },
                 "right-bottom-resize": {
-                    cursor: "nw-resize",
+                    cursor: "nwse-resize",
                     resizeFuncs: [resizeXOnRight, resizeYOnBottom],
                 },
             };
             // 获取当前的resize类型
             const { cursor, resizeFuncs } = resizePropsMap[className];
             // 禁用用户选择、设置鼠标指针，临时设置窗口zIndex
-            document.documentElement.style.userSelect = "none";
+            this.enablePanelInteraction(false);
             document.documentElement.style.cursor = cursor;
             nodeElem.style.zIndex = "99999";
             this.doBringToFront = false;
@@ -439,7 +480,7 @@ export default {
                     documentMouseUpListener
                 );
                 // 恢复用户选择和鼠标方向
-                document.documentElement.style.userSelect = null;
+                this.enablePanelInteraction(true);
                 document.documentElement.style.cursor = null;
                 nodeElem.style.zIndex = null;
                 this.doBringToFront = true;
@@ -456,12 +497,15 @@ export default {
             const { clientX: x0, clientY: y0 } = event;
             const top0 = node.top,
                 left0 = node.left;
-            // 停用用户选择
-            document.documentElement.style.userSelect = "none";
+
+            this.enablePanelInteraction(false);
+
             // 暂停浮动面板zIndex调整
             this.doBringToFront = false;
             // 调整zIndex，置顶本结点
-            this.$refs.node.style.zIndex = "99999";
+            if (!this.maximized) this.$refs.node.style.zIndex = "99999";
+
+            let isMoved = false;
 
             const documentMouseMoveListener = (ev) => {
                 const { clientX: x, clientY: y } = ev;
@@ -472,10 +516,12 @@ export default {
 
                 node.top = top0 + ((y - y0) / layoutHeight) * 100;
                 node.left = left0 + ((x - x0) / layoutWidth) * 100;
+
+                isMoved = true;
             };
             document.addEventListener("mousemove", documentMouseMoveListener);
 
-            const documentMouseUpListener = () => {
+            const documentMouseUpListener = (ev) => {
                 document.removeEventListener(
                     "mousemove",
                     documentMouseMoveListener
@@ -484,18 +530,26 @@ export default {
                     "mouseup",
                     documentMouseUpListener
                 );
-                document.documentElement.style.userSelect = null;
+                this.enablePanelInteraction(true);
+
                 // 恢复zIndex
-                this.$refs.node.style.zIndex = null;
+                if (!this.maximized) this.$refs.node.style.zIndex = null;
                 // 恢复浮动面板zIndex调整
                 this.doBringToFront = true;
-                this.bringPanelToFront(this.path, node);
+                if (isMoved) {
+                    this.bringPanelToFront(this.path, node);
+                    this.handleMaximizePanel();
+                }
             };
             document.addEventListener("mouseup", documentMouseUpListener);
         },
         // 处理浮动结点鼠标按下事件
         handleFloatingNodeMouseDown() {
-            if (this.floating === false || this.doBringToFront === false)
+            if (
+                this.floating === false ||
+                this.doBringToFront === false ||
+                this.maximized
+            )
                 return;
             this.bringPanelToFront(this.path);
         },
@@ -503,10 +557,17 @@ export default {
         handleDestroyFloatingNode(event) {
             this.$emit("destruct");
             event.stopPropagation();
-            console.log("remove");
         },
-        handleMaximizePanel() {},
-        handleMinimizePanel() {},
+        handleMaximizePanel() {
+            this.maximized = !this.maximized;
+            this.$refs.node.style.zIndex = this.maximized ? "99999" : null;
+        },
+        handleMinimizePanel() {
+            const node = this.layoutNodeCache;
+            node.width = node.minWidth;
+            node.height = node.minHeight;
+            this.bringPanelToFront(this.path, node);
+        },
         // 抛出异常诊断信息
         throwNodeError(msg) {
             console.error(`DockedLayoutNode`, this.layoutNode, "抛出异常");
@@ -624,10 +685,10 @@ export default {
                 );
             }
             return {
-                top: `${top}%` || "0",
-                left: `${left}%` || "0",
-                width: `${width}%` || "25%",
-                height: `${height}%` || "25%",
+                top: this.maximized ? "0" : `${top}%` || "0",
+                left: this.maximized ? "0" : `${left}%` || "0",
+                width: this.maximized ? "100%" : `${width}%` || "25%",
+                height: this.maximized ? "100%" : `${height}%` || "25%",
                 minWidth: `${minWidth}%` || "15%",
                 minHeight: `${minHeight}%` || "15%",
                 zIndex: zIndex || "1",
@@ -707,6 +768,8 @@ export default {
         floatPanel: "floatPanel",
         // 调整浮动面板zIndex
         bringPanelToFront: "bringPanelToFront",
+        // 开关面板鼠标交互
+        enablePanelInteraction: "enablePanelInteraction",
     },
 };
 </script>
@@ -829,7 +892,7 @@ $resizeBarSize: var(--docked-layout-panel-resize-bar-size, 5px);
     top: calc(0px - $resizeBarSize);
     width: calc($resizeBarSize * 2);
     height: calc($resizeBarSize * 2);
-    cursor: nw-resize;
+    cursor: nwse-resize;
 }
 
 .left-bottom-resize {
@@ -838,7 +901,7 @@ $resizeBarSize: var(--docked-layout-panel-resize-bar-size, 5px);
     bottom: calc(0px - $resizeBarSize);
     width: calc($resizeBarSize * 2);
     height: calc($resizeBarSize * 2);
-    cursor: ne-resize;
+    cursor: nesw-resize;
 }
 
 .right-top-resize {
@@ -847,7 +910,7 @@ $resizeBarSize: var(--docked-layout-panel-resize-bar-size, 5px);
     top: calc(0px - $resizeBarSize);
     width: calc($resizeBarSize * 2);
     height: calc($resizeBarSize * 2);
-    cursor: ne-resize;
+    cursor: nesw-resize;
 }
 
 .right-bottom-resize {
@@ -856,6 +919,6 @@ $resizeBarSize: var(--docked-layout-panel-resize-bar-size, 5px);
     bottom: calc(0px - $resizeBarSize);
     width: calc($resizeBarSize * 2);
     height: calc($resizeBarSize * 2);
-    cursor: nw-resize;
+    cursor: nwse-resize;
 }
 </style>

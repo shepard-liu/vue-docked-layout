@@ -6,6 +6,7 @@
                     v-for="(tabName, index) in components"
                     class="tab"
                     :active="tabName === currentTab"
+                    :floating="floating"
                     @closePanel="
                         $emit('closePanel', { component: tabName, index })
                     "
@@ -34,7 +35,8 @@
                     "
                     @mouseDown="switchTab(index)"
                     :canCloseOtherPanels="components.length > 1"
-                    :key="tabName">
+                    :key="tabName"
+                >
                     {{ tabName }}
                 </DockedLayoutTab>
                 <!-- 占据面板导航栏剩余空间（若有）的元素，用作尾部拖放区 -->
@@ -44,12 +46,15 @@
                     @dragenter="handleNavDragEnter"
                     @dragover="handleNavDragOver"
                     @drop="handleNavDrop"
-                    @dragleave="handleNavDragLeave"></div>
+                    @dragleave="handleNavDragLeave"
+                ></div>
                 <!-- 激活面板选择按钮 -->
                 <div
                     class="more-btn"
+                    @mousedown="$event.stopPropagation()"
                     @click="handleClickMoreBtn"
-                    v-show="showMoreBtn">
+                    v-show="showMoreBtn"
+                >
                     <IconDropdown class="more-btn-icon" />
                 </div>
             </div>
@@ -59,7 +64,8 @@
                     v-for="(tabName, index) in components"
                     @mouseDown="switchTab(index)"
                     :active="tabName === currentTab"
-                    :key="tabName">
+                    :key="tabName"
+                >
                     {{ tabName }}
                 </DockedLayoutMenuItem>
             </DockedLayoutMenu>
@@ -69,7 +75,8 @@
             class="tab-content"
             ref="tabContent"
             @dragenter="++contentDragCounter"
-            @dragleave="--contentDragCounter">
+            @dragleave="--contentDragCounter"
+        >
             <!-- 停靠操作面板 -->
             <template v-if="contentDragCounter > 0">
                 <div
@@ -82,7 +89,8 @@
                     "
                     @dragleave="--contentDragCounter"
                     @dragover="handleDockAreaDragOver"
-                    @drop="handleDockAreaDrop(area.name, $event)" />
+                    @drop="handleDockAreaDrop(area.name, $event)"
+                />
             </template>
             <slot :name="currentTab"></slot>
         </div>
@@ -95,6 +103,9 @@ import IconDropdown from "../assets/IconDropdown.vue";
 import DockedLayoutMenu from "./DockedLayoutMenu.vue";
 import DockedLayoutMenuItem from "./DockedLayoutMenuItem.vue";
 import { toggleMenu } from "../utils";
+import { draggingPanel } from "./common.data";
+import lodash from "lodash";
+
 export default {
     name: "DockedLayoutTabPanel",
     props: {
@@ -105,6 +116,8 @@ export default {
             type: Array,
             required: true,
         },
+        // 是否为浮动结点下的面板
+        floating: Boolean,
     },
     components: {
         DockedLayoutTab,
@@ -120,34 +133,6 @@ export default {
             showTabsMenu: false,
             // 导航条拖放悬浮
             navDragOver: false,
-            // 停靠面板操作区类名列表
-            dockActionPaneAreas: [
-                // "向左停靠面板"拖放区域
-                {
-                    className: "dock-left",
-                    name: "left",
-                },
-                // "向右停靠面板"拖放区域
-                {
-                    className: "dock-right",
-                    name: "right",
-                },
-                // "向上停靠面板"拖放区域
-                {
-                    className: "dock-above",
-                    name: "above",
-                },
-                // "向下停靠面板"拖放区域
-                {
-                    className: "dock-below",
-                    name: "below",
-                },
-                // "停入面板"拖放区域
-                {
-                    className: "dock-into",
-                    name: "center",
-                },
-            ],
             /**
              * 内容区拖放进出计数器
              *
@@ -165,6 +150,43 @@ export default {
     computed: {
         currentTab() {
             return this.activeComponent || this.components[0];
+        },
+        // 停靠面板操作区类名列表
+        dockActionPaneAreas() {
+            return this.floating
+                ? [
+                      {
+                          className: "dock-into dock-into--floating",
+                          name: "center",
+                      },
+                  ]
+                : [
+                      // "向左停靠面板"拖放区域
+                      {
+                          className: "dock-left",
+                          name: "left",
+                      },
+                      // "向右停靠面板"拖放区域
+                      {
+                          className: "dock-right",
+                          name: "right",
+                      },
+                      // "向上停靠面板"拖放区域
+                      {
+                          className: "dock-above",
+                          name: "above",
+                      },
+                      // "向下停靠面板"拖放区域
+                      {
+                          className: "dock-below",
+                          name: "below",
+                      },
+                      // "停入面板"拖放区域
+                      {
+                          className: "dock-into",
+                          name: "center",
+                      },
+                  ];
         },
     },
     methods: {
@@ -340,6 +362,21 @@ export default {
     position: relative;
 }
 
+@keyframes dockedAreaDragOverBreath {
+    0% {
+        transform: none;
+        opacity: 0.2;
+    }
+    50% {
+        transform: scale(1.1);
+        opacity: 0;
+    }
+    100% {
+        transform: none;
+        opacity: 0.2;
+    }
+}
+
 @mixin dockAreaMixin($orient: NULL) {
     position: absolute;
     z-index: 99999; // 显示在面板内容之前
@@ -353,11 +390,8 @@ export default {
         height: 25%;
     }
 
-    transition: all 200ms ease-in-out;
-
     &[data-drag-over="true"] {
-        transform: scale(1.1);
-        opacity: 0;
+        animation: dockedAreaDragOverBreath 800ms infinite;
     }
 }
 // 向上停靠区
@@ -406,5 +440,12 @@ export default {
     height: 50%;
     top: 25%;
     left: 25%;
+}
+
+.dock-into--floating {
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
 }
 </style>

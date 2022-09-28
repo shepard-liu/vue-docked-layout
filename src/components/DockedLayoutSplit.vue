@@ -20,8 +20,7 @@ export default {
             // 拖动起点位置
             const start = ev[posProp];
 
-            // 临时停用用户选择
-            document.documentElement.style.userSelect = "none";
+            this.enablePanelInteraction(false);
             document.documentElement.style.cursor =
                 this.orient === "v" ? "col-resize" : "row-resize";
 
@@ -52,8 +51,7 @@ export default {
 
             // document上的鼠标按键弹起事件监听器
             const documentMouseUpListener = () => {
-                // 重新启用用户选择
-                document.documentElement.style.userSelect = null;
+                this.enablePanelInteraction(true);
                 document.documentElement.style.cursor = null;
                 document.removeEventListener(
                     "mousemove",

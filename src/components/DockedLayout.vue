@@ -4,11 +4,13 @@
             class="layout-root-node"
             :layoutNode="currentLayout"
             :isRoot="true"
-            :path="[]">
+            :path="[]"
+        >
             <slot
                 v-for="(_, slotName) in $slots"
                 :name="slotName"
-                :slot="slotName"></slot>
+                :slot="slotName"
+            ></slot>
         </DockedLayoutNode>
     </div>
 </template>
@@ -85,13 +87,19 @@ export default {
          * @param {number[]} path 结点路径序列，根结点为空数组
          */
         getNodeLayoutFromPath(root, path) {
-            let currentNode = root;
+            if (Array.isArray(path)) {
+                let currentNode = root;
 
-            for (let i = 0; i < path.length; ++i) {
-                currentNode = currentNode.children[path[i]];
+                for (let i = 0; i < path.length; ++i) {
+                    currentNode = currentNode.children[path[i]];
+                }
+
+                return currentNode;
+            } else if (typeof path === "number") {
+                return root.floating[path];
+            } else {
+                throw new Error("DockedLayout: 路径类型错误");
             }
-
-            return currentNode;
         },
     },
     mounted() {},
@@ -102,6 +110,10 @@ export default {
         // 浮动窗口调整zIndex的核心函数，该函数不会更新布局树
         function __bringPanelToFront(root, index) {
             const floatingPanels = root.floating;
+            if (floatingPanels.length === 1) {
+                floatingPanels[index].zIndex = 1;
+                return;
+            }
             // 使用zIndex从 1 ~ maximumFloatingPanels 的数值
             const curMax = floatingPanels
                 .map((panel) => panel.zIndex)
@@ -421,6 +433,24 @@ export default {
                     event.dataTransfer.getData("docked_layout_dnd_type") ===
                     "panel_dnd"
                 );
+            },
+
+            /**
+             * 是否停用面板鼠标交互、document鼠标选择
+             * @param {boolean} enabled
+             */
+            enablePanelInteraction(enabled) {
+                // 临时停用用户选择
+                document.documentElement.style.userSelect = enabled
+                    ? null
+                    : "none";
+                // 临时禁用所有tab面板鼠标事件
+                const tabPanelContentElems = document.querySelectorAll(
+                    ".docked-layout .docked-layout-tab-panel > .tab-content > *:not(.dock-area)"
+                );
+                tabPanelContentElems.forEach((elem) => {
+                    elem.style["pointer-events"] = enabled ? null : "none";
+                });
             },
         };
         return provideObject;
