@@ -35,8 +35,7 @@
                     "
                     @mouseDown="switchTab(index)"
                     :canCloseOtherPanels="components.length > 1"
-                    :key="tabName"
-                >
+                    :key="tabName">
                     {{ tabName }}
                 </DockedLayoutTab>
                 <!-- 占据面板导航栏剩余空间（若有）的元素，用作尾部拖放区 -->
@@ -46,15 +45,13 @@
                     @dragenter="handleNavDragEnter"
                     @dragover="handleNavDragOver"
                     @drop="handleNavDrop"
-                    @dragleave="handleNavDragLeave"
-                ></div>
+                    @dragleave="handleNavDragLeave"></div>
                 <!-- 激活面板选择按钮 -->
                 <div
                     class="more-btn"
                     @mousedown="$event.stopPropagation()"
                     @click="handleClickMoreBtn"
-                    v-show="showMoreBtn"
-                >
+                    v-show="showMoreBtn">
                     <IconDropdown class="more-btn-icon" />
                 </div>
             </div>
@@ -64,8 +61,7 @@
                     v-for="(tabName, index) in components"
                     @mouseDown="switchTab(index)"
                     :active="tabName === currentTab"
-                    :key="tabName"
-                >
+                    :key="tabName">
                     {{ tabName }}
                 </DockedLayoutMenuItem>
             </DockedLayoutMenu>
@@ -75,8 +71,7 @@
             class="tab-content"
             ref="tabContent"
             @dragenter="++contentDragCounter"
-            @dragleave="--contentDragCounter"
-        >
+            @dragleave="--contentDragCounter">
             <!-- 停靠操作面板 -->
             <template v-if="contentDragCounter > 0">
                 <div
@@ -89,8 +84,7 @@
                     "
                     @dragleave="--contentDragCounter"
                     @dragover="handleDockAreaDragOver"
-                    @drop="handleDockAreaDrop(area.name, $event)"
-                />
+                    @drop="handleDockAreaDrop(area.name, $event)" />
             </template>
             <slot :name="currentTab"></slot>
         </div>
@@ -360,6 +354,7 @@ export default {
     flex: 1;
     overflow: hidden;
     position: relative;
+    background-color: white;
 }
 
 @keyframes dockedAreaDragOverBreath {

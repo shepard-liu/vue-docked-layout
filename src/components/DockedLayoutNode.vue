@@ -97,10 +97,11 @@
             <!-- 在子结点之间渲染分割条组件 -->
             <DockedLayoutSplit
                 v-if="index !== layoutNodeCache?.children.length - 1"
+                :orient="layoutNodeCache.orient"
+                :size="layoutConfig?.splitSize"
                 @splitDragStart="handleSplitDragStart(index, $event)"
                 @splitDrag="handleSplitDrag(index, $event)"
-                @splitDragEnd="handleSplitDragEnd(index, $event)"
-                :orient="layoutNodeCache.orient" />
+                @splitDragEnd="handleSplitDragEnd(index, $event)" />
         </template>
         <!-- 若为根结点，渲染浮动面板 -->
         <DockedLayoutNode
@@ -151,7 +152,7 @@ const orientPropsMap = {
         maxMainSizeProp: "maxWidth",
         crossSizeProp: "height",
         displayStyle: "inline-block",
-        splitSizeProp: "splitWidth",
+        splitSizeProp: "splitSize",
         parentSizeProp: "offsetWidth",
     },
     h: {
@@ -160,7 +161,7 @@ const orientPropsMap = {
         maxMainSizeProp: "maxHeight",
         crossSizeProp: "width",
         displayStyle: "block",
-        splitSizeProp: "splitHeight",
+        splitSizeProp: "splitSize",
         parentSizeProp: "offsetHeight",
     },
 };
@@ -649,15 +650,19 @@ export default {
                 (node.children.length - 1) / node.children.length;
             const splitSize = this.layoutConfig[splitSizeProp] || "5px"; // 默认 5px 的分割线尺寸
 
-            return node.children.map((child) => ({
+            const childStyles = node.children.map((child) => ({
                 display: displayStyle,
                 [crossSizeProp]: `100%`,
                 [maxMainSizeProp]: `${
                     100 - minSizeSum + child[minMainSizeProp]
                 }%`,
-                [mainSizeProp]: `calc(${child[mainSizeProp]}% - ${splitSize} * ${avgCompensateRate}`,
+                [mainSizeProp]: `calc(${child[mainSizeProp]}% - ${splitSize}px * ${avgCompensateRate})`,
                 [minMainSizeProp]: `calc(${child[minMainSizeProp]}% - ${splitSize} * ${avgCompensateRate})`, // 未指定最小尺寸时默认为10%
             }));
+
+            console.log("child-styles", childStyles);
+
+            return childStyles;
         },
         // 浮动结点样式表
         floatingNodeStyle() {
@@ -767,7 +772,6 @@ export default {
 @use "./shared.scss";
 
 .docked-layout-node {
-    border: 1px solid black;
     vertical-align: top;
     position: relative;
 }
@@ -775,7 +779,6 @@ export default {
 .docked-layout-node--floating {
     // 覆盖.docked-layout-node的position属性
     position: absolute;
-
     display: flex;
     flex-direction: column;
 
@@ -783,6 +786,13 @@ export default {
         // 这将覆盖.tab-panel的height属性，因其父元素为纵向flex容器
         flex: 1;
     }
+}
+
+// 为面板或浮动结点指定圆角
+.docked-layout-node:not(.docked-layout-node--floating),
+.docked-layout-node--floating {
+    border-radius: 16px;
+    overflow: hidden;
 }
 
 .tab-panel {

@@ -1,4 +1,5 @@
 export const testLayout1 = {
+    splitSize: 5,
     floating: [
         {
             top: 20.52,

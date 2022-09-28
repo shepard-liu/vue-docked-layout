@@ -2,8 +2,7 @@
     <div
         class="docked-layout-split"
         :style="splitStyle"
-        @mousedown="handleMouseDown"
-    ></div>
+        @mousedown="handleMouseDown"></div>
 </template>
 
 <script>
@@ -12,6 +11,11 @@ export default {
     props: {
         // 分割条朝向
         orient: String,
+        // 分割条尺寸
+        size: {
+            type: Number,
+            default: 5,
+        },
     },
     methods: {
         // 在分割条上鼠标按下时记录坐标，并在document上注册鼠标事件监听器
@@ -76,17 +80,22 @@ export default {
             return this.orient === "v"
                 ? {
                       height: "100%",
+                      width: this.size + "px",
                       display: "inline-block",
                       cursor: "col-resize",
                       "--split-scale-hor": "3.0",
                   }
                 : {
                       width: "100%",
+                      height: this.size + "px",
                       display: "block",
                       cursor: "row-resize",
                       "--split-scale-ver": "3.0",
                   };
         },
+    },
+    inject: {
+        enablePanelInteraction: "enablePanelInteraction",
     },
 };
 </script>
@@ -95,9 +104,7 @@ export default {
 @use "./shared.scss";
 
 .docked-layout-split {
-    width: 5px;
-    height: 5px;
-    background-color: gray;
+    background-color: #7494ec;
     vertical-align: top;
     position: relative;
     z-index: 1;

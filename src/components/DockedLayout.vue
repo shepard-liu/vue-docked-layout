@@ -61,13 +61,17 @@ export default {
         this.currentLayout = this.layout || this.defaultLayout;
     },
     watch: {
-        layout(val) {
-            if (!validateLayoutObjectType(val))
-                throw new Error(
-                    "DockedLayout: layout属性必须为符合schema的配置对象",
-                    val
-                );
-            this.currentLayout = val;
+        layout: {
+            handler(val) {
+                if (!validateLayoutObjectType(val))
+                    throw new Error(
+                        "DockedLayout: layout属性必须为符合schema的配置对象",
+                        val
+                    );
+                this.currentLayout = val;
+                console.log("current", this.currentLayout);
+            },
+            immediate:true,
         },
     },
     methods: {

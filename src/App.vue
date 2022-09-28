@@ -44,6 +44,9 @@ export default {
 </script>
 
 <style>
+* {
+    box-sizing: border-box;
+}
 html {
     height: 100%;
 }
@@ -56,11 +59,13 @@ html,
 body {
     padding: 0;
     margin: 0;
+    background: #7494ec;
 }
 
 .app {
     width: 100vw;
     height: 100vh;
+    padding: 10px;
 }
 
 .main-layout {
