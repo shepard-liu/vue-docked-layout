@@ -75,7 +75,9 @@
             v-if="isComponentNode"
             :components="layoutNodeCache?.components"
             :floating="floating"
-            :activeComponent="layoutNodeCache.activeComponent"
+            :activeComponent="layoutNodeCache?.activeComponent"
+            :autoHideTabNav="layoutNodeCache?.autoHideTabNav"
+            @toggleAutoHideTabNav="handleToggleAutoHideTabNav"
             @activeChange="handleTabActiveChange"
             @closePanel="handleClosePanel"
             @closeOtherPanels="handleCloseOtherPanels"
@@ -131,7 +133,7 @@
 
 <script>
 import lodash from "lodash";
-import { approxEq } from "../utils";
+import { approxEq, isNullOrUndefined } from "../utils";
 import { uniqueId } from "../utils/uniqueId";
 import DockedLayoutTabPanel from "./DockedLayoutTabPanel.vue";
 import DockedLayoutSplit from "./DockedLayoutSplit.vue";
@@ -563,6 +565,16 @@ export default {
                 return;
             this.bringPanelToFront(this.path);
         },
+        // 处理切换自动隐藏面板组页签栏
+        handleToggleAutoHideTabNav() {
+            const node = this.layoutNodeCache;
+
+            node.autoHideTabNav = isNullOrUndefined(node.autoHideTabNav)
+                ? true
+                : !node.autoHideTabNav;
+
+            this.updateLayoutTree(node);
+        },
         // 处理关闭浮动面板
         handleDestroyFloatingNode(event) {
             this.$emit("destruct");
@@ -794,6 +806,7 @@ export default {
 .docked-layout-node {
     vertical-align: top;
     position: relative;
+    border-radius: 10px;
 }
 
 .docked-layout-node--floating {
@@ -811,10 +824,18 @@ export default {
 }
 
 // 为面板或浮动结点指定圆角
-.docked-layout-node:not(.docked-layout-node--floating),
+.docked-layout-node:not(.docked-layout-node--floating) > .tab-panel {
+    border-radius: 10px 10px 0 0;
+
+    :deep(.tab-nav),
+    :deep(.tab-nav-wrapper) {
+        border-radius: 10px 10px 0 0;
+    }
+}
 .docked-layout-node--floating {
-    border-radius: 10px;
-    overflow: hidden;
+    .panel-topbar {
+        border-radius: 10px 10px 0 0;
+    }
 }
 
 .tab-panel {

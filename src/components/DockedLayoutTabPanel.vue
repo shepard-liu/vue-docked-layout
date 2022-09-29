@@ -1,12 +1,13 @@
 <template>
     <div class="docked-layout-tab-panel">
-        <div class="tab-nav-wrapper">
+        <div class="tab-nav-wrapper" :data-auto-hide="autoHideTabNav">
             <div class="tab-nav" ref="tabNav" @wheel="handleScrollTabNav">
                 <DockedLayoutTab
                     v-for="(tabName, index) in components"
                     class="tab"
                     :active="tabName === currentTab"
                     :floating="floating"
+                    :autoHideTabNav="autoHideTabNav"
                     @closePanel="
                         $emit('closePanel', { component: tabName, index })
                     "
@@ -32,6 +33,9 @@
                             },
                             $event
                         )
+                    "
+                    @toggleAutoHideTabNav="
+                        $emit('toggleAutoHideTabNav', $event)
                     "
                     @mouseDown="switchTab(index)"
                     :canCloseOtherPanels="components.length > 1"
@@ -110,6 +114,8 @@ export default {
         },
         // 是否为浮动结点下的面板
         floating: Boolean,
+        // 是否自动隐藏tab导航栏
+        autoHideTabNav: Boolean,
     },
     components: {
         DockedLayoutTab,
@@ -138,6 +144,13 @@ export default {
             // 导航栏resize观察者
             tabNavResizeOb: null,
         };
+    },
+    watch: {
+        autoHideTabNav(val) {
+            if (val !== null && val !== undefined) {
+                this.currentAutoHideTabNavState = this.autoHideTabNav;
+            }
+        },
     },
     computed: {
         currentTab() {
@@ -266,6 +279,7 @@ export default {
         "closeOtherPanels",
         "closePanelGroup",
         "floatPanel",
+        "toggleAutoHideTabNav",
         "panelDragStart",
         "panelDropOnNav",
         "panelDropOnContent",
@@ -283,13 +297,39 @@ export default {
 .docked-layout-tab-panel {
     display: flex;
     flex-direction: column;
+    z-index: inherit;
 }
 
 .tab-nav-wrapper {
     height: 28px;
+    width: 100%;
+    background: #e2e9ff;
+    z-index: inherit;
 
     // 为菜单提供定位参考
     position: relative;
+
+    transition: max-height 200ms ease-in-out;
+
+    &[data-auto-hide="true"] {
+        max-height: 10px;
+
+        * {
+            transition: opacity 200ms ease-in-out;
+        }
+
+        &:not(:hover) * {
+            opacity: 0 !important;
+        }
+
+        &:hover {
+            max-height: 28px;
+
+            * {
+                opacity: unset;
+            }
+        }
+    }
 }
 
 .tab-nav {
@@ -353,10 +393,12 @@ export default {
     border-radius: 0px 0px 0px 10px;
     max-height: 200px;
     background: #f7f9ff;
+    box-shadow: 1px 3px 10px 4px rgba(172, 188, 231, 0.3);
 }
 
 .tab-content {
     flex: 1;
+    border-radius: 0 0 10px 10px;
     overflow: hidden;
     position: relative;
     background-color: white;

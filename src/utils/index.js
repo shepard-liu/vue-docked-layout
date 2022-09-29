@@ -97,3 +97,6 @@ export function throttleSync(fn, ms) {
 
 // 近似相等
 export const approxEq = (n1, n2, epsilon = Number.EPSILON) => Math.abs(n1 - n2) < epsilon;
+
+// 判断是否未指定
+export const isNullOrUndefined = (object) => object === null || object === undefined;

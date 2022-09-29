@@ -28,24 +28,39 @@
             class="tab-menu"
             :show="showTabMenu && !dragging"
             :style="{ right: `${menuRightOffset}px` }">
-            <DockedLayoutMenuItem
-                v-for="item in menuItems"
-                @mouseDown="handleMenuItemMouseDown(item)"
-                :disabled="item.disabled"
-                :key="item.name">
-                {{ item.name }}
-            </DockedLayoutMenuItem>
+            <template v-for="item in menuItems">
+                <DockedLayoutMenuItem
+                    v-if="item.type === 'menu-item'"
+                    class="menu-item"
+                    @mouseDown="handleMenuItemMouseDown(item)"
+                    :disabled="item.disabled">
+                    <component
+                        v-if="item.icon"
+                        class="menu-icon"
+                        :is="menuIcon(item.icon)" />
+                    <span>
+                        {{ item.name }}
+                    </span>
+                </DockedLayoutMenuItem>
+                <div v-else class="menu-item-sep"></div>
+            </template>
         </DockedLayoutMenu>
     </div>
 </template>
 
 <script>
+import IconPinned from "../assets/IconPinned.vue";
+import IconUnpinned from "../assets/IconUnpinned.vue";
 import IconMenu from "../assets/IconMenu.vue";
 import { toggleMenu } from "../utils";
 import DockedLayoutMenu from "./DockedLayoutMenu.vue";
 import DockedLayoutMenuItem from "./DockedLayoutMenuItem.vue";
 export default {
     name: "DockedLayoutTab",
+    components: {
+        IconPinned,
+        IconUnpinned,
+    },
     props: {
         // 是否为激活状态
         active: Boolean,
@@ -53,6 +68,8 @@ export default {
         canCloseOtherPanels: Boolean,
         // 是否为浮动窗口的tab
         floating: Boolean,
+        // 面板组是否现在自动隐藏页签栏
+        autoHideTabNav: Boolean,
     },
     data() {
         return {
@@ -72,26 +89,48 @@ export default {
             return [
                 {
                     name: "关闭面板",
+                    type: "menu-item",
                     emitMessage: "closePanel",
                 },
                 {
                     name: "浮动面板",
+                    type: "menu-item",
                     emitMessage: "floatPanel",
                     disabled: this.floating,
                 },
                 {
                     name: "关闭面板组其他面板",
+                    type: "menu-item",
                     emitMessage: "closeOtherPanels",
                     disabled: !this.canCloseOtherPanels,
                 },
                 {
                     name: "关闭面板组",
+                    type: "menu-item",
                     emitMessage: "closePanelGroup",
+                },
+                {
+                    type: "seperator",
+                },
+                {
+                    name: this.autoHideTabNav
+                        ? "自动隐藏页签栏"
+                        : "始终显示页签栏",
+                    type: "menu-item",
+                    emitMessage: "toggleAutoHideTabNav",
+                    icon: this.autoHideTabNav ? "IconUnpinned" : "IconPinned",
                 },
             ];
         },
     },
     methods: {
+        // 菜单项图标
+        menuIcon(name) {
+            return {
+                IconPinned,
+                IconUnpinned,
+            }[name];
+        },
         // 处理激活菜单
         handleClickMenu() {
             const tabElem = this.$refs.tab,
@@ -178,6 +217,7 @@ export default {
         "dragLeave",
         "dragOver",
         "drop",
+        "toggleAutoHideTabNav",
     ],
     components: { IconMenu, DockedLayoutMenu, DockedLayoutMenuItem },
     inject: {
@@ -247,5 +287,20 @@ export default {
     border-radius: 0px 0px 10px 10px;
     max-height: 200px;
     background: #f7f9ff;
+    box-shadow: 1px 3px 10px 4px rgba(172, 188, 231, 0.3);
+}
+
+.menu-icon {
+    height: 12px;
+    width: auto;
+    position: relative;
+    top: 1px;
+}
+
+.menu-item-sep {
+    height: 1px;
+    background: #516bb9;
+    width: 85%;
+    margin: auto;
 }
 </style>
