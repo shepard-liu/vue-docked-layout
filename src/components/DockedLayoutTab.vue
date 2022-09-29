@@ -2,9 +2,9 @@
     <div
         class="docked-layout-tab"
         ref="tab"
+        :data-drag-over="dragOver"
         :data-active="active"
         :data-dragging="dragging"
-        :data-drag-over="dragOver"
         :draggable="active"
         @dragstart="handleDragStart"
         @drag="$emit('drag', $event)"
@@ -15,28 +15,24 @@
         @drop="handleDrop"
         @mousedown="$emit('mouseDown', $event)"
         @mouseup="$emit('mouseUp', $event)"
-        @click="$emit('click', $event)"
-    >
+        @click="$emit('click', $event)">
         <slot />
         <div
             @mousedown="$event.stopPropagation()"
             @click="handleClickMenu"
             class="icon-menu-wrapper"
-            :data-show="active"
-        >
+            :data-show="active">
             <IconMenu class="icon-menu" />
         </div>
         <DockedLayoutMenu
-            class="tabs-menu"
-            :show="showTabsMenu && !dragging"
-            :style="{ right: `${menuRightOffset}px` }"
-        >
+            class="tab-menu"
+            :show="showTabMenu && !dragging"
+            :style="{ right: `${menuRightOffset}px` }">
             <DockedLayoutMenuItem
                 v-for="item in menuItems"
                 @mouseDown="handleMenuItemMouseDown(item)"
                 :disabled="item.disabled"
-                :key="item.name"
-            >
+                :key="item.name">
                 {{ item.name }}
             </DockedLayoutMenuItem>
         </DockedLayoutMenu>
@@ -61,7 +57,7 @@ export default {
     data() {
         return {
             // 是否显示菜单
-            showTabsMenu: false,
+            showTabMenu: false,
             // 菜单位置
             menuRightOffset: 0,
             // 是否正在被拖动
@@ -106,7 +102,7 @@ export default {
                 tabNavElem.offsetWidth -
                 tabElem.offsetLeft -
                 tabElem.offsetWidth;
-            toggleMenu(this, "showTabsMenu");
+            toggleMenu(this, "showTabMenu");
         },
         // 处理点击菜单项
         handleMenuItemMouseDown({ disabled, emitMessage }) {
@@ -118,6 +114,13 @@ export default {
             event.dataTransfer.effectAllowed = "move";
             this.$emit("dragStart", event);
             this.enablePanelInteraction(false);
+
+            const dropListener = () => {
+                this.enablePanelInteraction(true);
+                document.removeEventListener("drop", dropListener);
+            };
+
+            document.addEventListener("drop", dropListener);
         },
         // 处理拖动结束
         handleDragEnd(event) {
@@ -190,30 +193,32 @@ export default {
 .docked-layout-tab {
     display: flex;
     align-items: center;
-
+    color: #4f68ac;
     height: 100%;
     padding: 0 10px;
-    background-color: rgb(216, 216, 216);
+    font-size: 12px;
+
+    background: #e2e9ff;
     user-select: none;
     cursor: pointer;
-
-    &[data-active="true"] {
-        background-color: rgb(183, 183, 183);
-        cursor: grab;
-    }
 
     &[data-dragging="true"] {
         opacity: 0.5;
     }
 
     &[data-drag-over="true"] {
-        background-color: gray;
+        background: #b8caff;
 
         & .icon-menu-wrapper {
             // 拖拽时遇到子元素会触发dragLeave事件，还有一种解决方案
             // @see https://stackoverflow.com/questions/7110353/html5-dragleave-fired-when-hovering-a-child-element
             pointer-events: none;
         }
+    }
+
+    &[data-active="true"]:not([data-drag-over="true"]) {
+        background: linear-gradient(180deg, #e0e8fd 0%, #c9d7fd 100%);
+        cursor: grab;
     }
 }
 
@@ -228,15 +233,19 @@ export default {
 }
 
 .icon-menu {
-    margin-left: 5px;
-    height: 13px;
+    margin-left: 10px;
+    height: 10px;
     width: auto;
     cursor: pointer;
 }
 
-.tabs-menu {
+.tab-menu {
     position: absolute;
     z-index: 99999;
     top: 100%;
+    width: 120px;
+    border-radius: 0px 0px 10px 10px;
+    max-height: 200px;
+    background: #f7f9ff;
 }
 </style>

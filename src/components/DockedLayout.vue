@@ -69,9 +69,8 @@ export default {
                         val
                     );
                 this.currentLayout = val;
-                console.log("current", this.currentLayout);
             },
-            immediate:true,
+            immediate: true,
         },
     },
     methods: {
@@ -175,11 +174,13 @@ export default {
                         newNodeLayout;
                     // 更新布局
                     self.updateLayout(newRootNode);
+                    provideObject.enablePanelInteraction(true);
                 } else if (typeof nodePath === "number") {
                     // 对于浮动面板
                     const newRootNode = lodash.cloneDeep(self.currentLayout);
                     newRootNode.floating[nodePath] = newNodeLayout;
                     self.updateLayout(newRootNode);
+                    provideObject.enablePanelInteraction(true);
                 } else {
                     throw new Error(
                         "DockedLayout: updateLayoutFromNode传入nodePath类型应为Array或number"

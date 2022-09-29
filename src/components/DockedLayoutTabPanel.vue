@@ -97,8 +97,6 @@ import IconDropdown from "../assets/IconDropdown.vue";
 import DockedLayoutMenu from "./DockedLayoutMenu.vue";
 import DockedLayoutMenuItem from "./DockedLayoutMenuItem.vue";
 import { toggleMenu } from "../utils";
-import { draggingPanel } from "./common.data";
-import lodash from "lodash";
 
 export default {
     name: "DockedLayoutTabPanel",
@@ -288,7 +286,7 @@ export default {
 }
 
 .tab-nav-wrapper {
-    height: 30px;
+    height: 28px;
 
     // 为菜单提供定位参考
     position: relative;
@@ -297,7 +295,7 @@ export default {
 .tab-nav {
     display: flex;
 
-    background-color: rgb(231, 231, 231);
+    background: #e2e9ff;
     overflow-x: auto;
     white-space: nowrap;
     height: 100%;
@@ -315,7 +313,7 @@ export default {
 
     // 拖放悬浮时
     &[data-drag-over="true"] {
-        background-color: rgb(160, 160, 160);
+        background-color: #b8caff;
     }
 }
 
@@ -329,18 +327,21 @@ export default {
     justify-content: center;
     align-items: center;
 
-    background-color: rgb(118, 118, 118);
+    border-radius: 0 0 0 10px;
+    box-shadow: -3px 0 6px 0 rgba(0, 0, 0, 0.1);
+
+    background: linear-gradient(180deg, #e0e8fd 0%, #c9d7fd 100%);
     height: 100%;
-    width: 25px;
-    padding: 5px;
+    width: 28px;
+    padding: 8px;
     vertical-align: top;
     color: white;
     cursor: pointer;
 }
 
 .more-btn-icon {
-    width: 16px;
-    height: 20px;
+    width: 10px;
+    color: #4f68ac;
 }
 
 .tabs-menu {
@@ -348,6 +349,10 @@ export default {
     z-index: 1;
     top: 100%;
     right: 0;
+    width: 100px;
+    border-radius: 0px 0px 0px 10px;
+    max-height: 200px;
+    background: #f7f9ff;
 }
 
 .tab-content {

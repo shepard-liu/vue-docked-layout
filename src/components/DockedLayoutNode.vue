@@ -51,15 +51,24 @@
             <div
                 class="close-panel"
                 @mousedown="$event.stopPropagation()"
-                @click="handleDestroyFloatingNode"></div>
+                @click="handleDestroyFloatingNode">
+                <IconClosePanel class="panel-control-btn-icon" />
+            </div>
             <div
                 class="minimize-panel"
                 @mousedown="$event.stopPropagation()"
-                @click="handleMinimizePanel"></div>
+                @click="handleMinimizePanel">
+                <IconMinimizePanel class="panel-control-btn-icon" />
+            </div>
             <div
                 class="maximize-panel"
                 @mousedown="$event.stopPropagation()"
-                @click="handleMaximizePanel"></div>
+                @click="handleMaximizePanel">
+                <IconMaximizePanel
+                    v-if="!maximized"
+                    class="panel-control-btn-icon" />
+                <IconRestorePanel v-else class="panel-control-btn-icon" />
+            </div>
         </div>
         <!-- 若为组件结点，则渲染Tab面板 -->
         <DockedLayoutTabPanel
@@ -128,6 +137,10 @@ import DockedLayoutTabPanel from "./DockedLayoutTabPanel.vue";
 import DockedLayoutSplit from "./DockedLayoutSplit.vue";
 import { panelResizeBarData } from "./DockedLayoutNode.data";
 import { draggingPanel, maximumFloatingPanels } from "./common.data";
+import IconClosePanel from "../assets/IconClosePanel.vue";
+import IconMaximizePanel from "../assets/IconMaximizePanel.vue";
+import IconMinimizePanel from "../assets/IconMinimizePanel.vue";
+import IconRestorePanel from "../assets/IconRestorePanel.vue";
 
 // 判断属性是否被忽略
 function isOmitted(value) {
@@ -168,7 +181,14 @@ const orientPropsMap = {
 
 export default {
     name: "DockedLayoutNode",
-    components: { DockedLayoutTabPanel, DockedLayoutSplit },
+    components: {
+        DockedLayoutTabPanel,
+        DockedLayoutSplit,
+        IconMaximizePanel,
+        IconClosePanel,
+        IconMinimizePanel,
+        IconRestorePanel,
+    },
     props: {
         // 布局结点对象，描述布局树一个结点的属性
         layoutNode: Object,
@@ -511,7 +531,7 @@ export default {
             };
             document.addEventListener("mousemove", documentMouseMoveListener);
 
-            const documentMouseUpListener = (ev) => {
+            const documentMouseUpListener = () => {
                 document.removeEventListener(
                     "mousemove",
                     documentMouseMoveListener
@@ -523,7 +543,7 @@ export default {
                 this.enablePanelInteraction(true);
 
                 // 恢复zIndex
-                if (!this.maximized) this.$refs.node.style.zIndex = null;
+                if (!this.maximized) this.$refs.node.style.zIndex = node.zIndex;
                 // 恢复浮动面板zIndex调整
                 this.doBringToFront = true;
                 if (isMoved) {
@@ -550,7 +570,9 @@ export default {
         },
         handleMaximizePanel() {
             this.maximized = !this.maximized;
-            this.$refs.node.style.zIndex = this.maximized ? "99999" : null;
+            this.$refs.node.style.zIndex = this.maximized
+                ? "99999"
+                : this.layoutNodeCache.zIndex;
         },
         handleMinimizePanel() {
             const node = this.layoutNodeCache;
@@ -659,8 +681,6 @@ export default {
                 [mainSizeProp]: `calc(${child[mainSizeProp]}% - ${splitSize}px * ${avgCompensateRate})`,
                 [minMainSizeProp]: `calc(${child[minMainSizeProp]}% - ${splitSize} * ${avgCompensateRate})`, // 未指定最小尺寸时默认为10%
             }));
-
-            console.log("child-styles", childStyles);
 
             return childStyles;
         },
@@ -782,6 +802,8 @@ export default {
     display: flex;
     flex-direction: column;
 
+    box-shadow: 1px 6px 20px 8px rgba(172, 188, 231, 0.5);
+
     & > .tab-panel {
         // 这将覆盖.tab-panel的height属性，因其父元素为纵向flex容器
         flex: 1;
@@ -791,7 +813,7 @@ export default {
 // 为面板或浮动结点指定圆角
 .docked-layout-node:not(.docked-layout-node--floating),
 .docked-layout-node--floating {
-    border-radius: 16px;
+    border-radius: 10px;
     overflow: hidden;
 }
 
@@ -801,9 +823,9 @@ export default {
 }
 
 .panel-topbar {
-    height: 25px;
+    height: 28px;
     padding-left: 5px;
-    background: #888888;
+    background: #7494ec;
     cursor: move;
 
     display: flex;
@@ -815,27 +837,26 @@ export default {
 */
 
 %panelControlBtn {
-    height: 12px;
-    width: 12px;
-    border-radius: 999px;
     cursor: pointer;
     margin-left: 6px;
-    box-shadow: 1px 1px 4px 0 rgba(0, 0, 0, 0.3);
+}
+
+.panel-control-btn-icon {
+    height: 12px;
+    width: 12px;
+    box-shadow: 1px 1px 4px 0px rgba(52, 82, 165, 0.7);
 }
 
 .close-panel {
     @extend %panelControlBtn;
-    background: rgb(255, 95, 87);
 }
 
 .minimize-panel {
     @extend %panelControlBtn;
-    background: rgb(255, 188, 46);
 }
 
 .maximize-panel {
     @extend %panelControlBtn;
-    background: rgb(43, 200, 64);
 }
 
 /**

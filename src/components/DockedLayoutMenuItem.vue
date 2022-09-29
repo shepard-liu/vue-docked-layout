@@ -24,19 +24,31 @@ export default {
 
 <style scoped lang="scss">
 .docked-layout-menu-item {
-    padding: 5px 0;
+    padding: 8px 0;
     font-size: 12px;
-    cursor: pointer;
 
-    &[data-active="true"] {
-        font-weight: bold;
-        cursor: auto;
-    }
+    text-align: center;
+
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    overflow: hidden;
+
+    cursor: pointer;
 
     &[data-disabled="true"] {
         cursor: auto;
         font-weight: normal;
         color: gray;
+    }
+
+    &:hover {
+        background: #e4ebff;
+    }
+
+    &[data-active="true"] {
+        cursor: auto;
+        background: #4f68ac;
+        color: white;
     }
 }
 </style>

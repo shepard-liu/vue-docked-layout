@@ -13,7 +13,7 @@ export function toggleMenu(self, showStateName) {
         // 暂停用户选择
         document.documentElement.style.userSelect = 'none';
         // 监听document上的鼠标按下事件
-        const documentMouseDownListener = (ev) => {
+        const documentMouseDownListener = () => {
             self[showStateName] = false;
             // 重启用户选择
             document.documentElement.style.userSelect = null;
